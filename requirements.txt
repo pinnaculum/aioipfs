@@ -1,0 +1,6 @@
+aiohttp>=2.0.0
+aiofiles
+async_generator>=1.0
+yarl
+base58
+tqdm
