@@ -2,9 +2,9 @@
 aioipfs
 =======
 
-:info: Asynchronous client library for IPFS
+:info: Asynchronous client library for IPFS_
 
-The **aioipfs** Python package provides asynchronous access to the IPFS API,
+The **aioipfs** Python package provides asynchronous access to the IPFS_ API,
 using Python 3.5's async/await mechanism.
 
 Installation
@@ -114,6 +114,7 @@ Requirements
 .. _yarl: https://pypi.python.org/pypi/yarl
 .. _async-timeout: https://pypi.python.org/pypi/async_timeout
 .. _async-generator: https://pypi.python.org/pypi/async_generator
+.. _IPFS: https://ipfs.io
 
 License
 =======

@@ -122,22 +122,36 @@ class SubAPI(object):
 class P2PAPI(SubAPI):
     # /p2p/*
 
-    async def listener_open(self, name, address):
-        params = quote_args(name, address)
+    async def listener_open(self, protocol, address):
+        params = quote_args(protocol, address)
         return await self.fetch_json(self.url('p2p/listener/open'),
                 params=params)
 
-    async def listener_ls(self):
-        return await self.fetch_json(self.url('p2p/listener/ls'))
+    async def listener_close(self, protocol, all=False):
+        params = {
+            ARG_PARAM: protocol,
+            'all': boolarg(all)
+        }
+        return await self.fetch_json(self.url('p2p/listener/close'),
+                params=params)
 
-    async def stream_dial(self, peer, protocol, address):
-        params = quote_args(peer, protocol, address)
+    async def listener_ls(self, headers=False):
+        return await self.fetch_json(self.url('p2p/listener/ls'),
+                params={'headers': boolarg(headers)})
+
+    async def stream_dial(self, peer, protocol, address=None):
+        args = [peer, protocol, address] if address else [peer, protocol]
+        params = quote_args(*args)
         return await self.fetch_json(self.url('p2p/stream/dial'),
                 params=params)
 
     async def stream_close(self, streamid, all=False):
         return await self.fetch_text(self.url('p2p/stream/close'),
                 params={ARG_PARAM: streamid})
+
+    async def stream_ls(self, headers=False):
+        return await self.fetch_json(self.url('p2p/stream/ls'),
+                params={'headers': boolarg(headers)})
 
 class BitswapAPI(SubAPI):
     async def ledger(self, peer):
@@ -283,7 +297,7 @@ class DhtAPI(SubAPI):
                 params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)})
 
     async def findprovs(self, peerid, verbose=False, numproviders=20):
-        params={
+        params = {
                 ARG_PARAM: peerid,
                 'verbose': boolarg(verbose),
                 'num-providers': numproviders
@@ -352,6 +366,24 @@ class FilesAPI(SubAPI):
         }
         return await self.fetch_json(self.url('files/stat'),
                 params=params)
+
+class FilestoreAPI(SubAPI):
+    async def dups(self):
+        return await self.fetch_json(self.url('filestore/dups'))
+
+    def __lsverifyparams(self, cid, fileorder):
+        return {
+            ARG_PARAM: cid,
+            'file-order': boolarg(fileorder)
+        }
+
+    async def ls(self, cid, fileorder=False):
+       return await self.fetch_json(self.url('filestore/ls'),
+                params=self.__lsverifyparams(cid, fileorder))
+
+    async def verify(self, cid, fileorder=False):
+       return await self.fetch_json(self.url('filestore/verify'),
+                params=self.__lsverifyparams(cid, fileorder))
 
 class KeyAPI(SubAPI):
     async def list(self, long=False):
@@ -568,6 +600,11 @@ class SwarmAPI(SubAPI):
     async def connect(self, peer):
         params = {ARG_PARAM: peer}
         return await self.fetch_json(self.url('swarm/connect'),
+                params=params)
+
+    async def disconnect(self, peer):
+        params = {ARG_PARAM: peer}
+        return await self.fetch_json(self.url('swarm/disconnect'),
                 params=params)
 
 class TarAPI(SubAPI):

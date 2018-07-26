@@ -53,7 +53,7 @@ apiport = 9001
 gwport = 9080
 swarmport = 9002
 
-@pytest.fixture(scope = 'module')
+@pytest.fixture(scope='module')
 def ipfsdaemon():
     # Starts a daemon on high port and temporary directory, yield it
     # when started and shut it down on fixture's exit
@@ -63,15 +63,17 @@ def ipfsdaemon():
     # Setup IPFS_PATH and initialize the repository
     os.putenv('IPFS_PATH', tmpdir)
     os.system('ipfs init -e')
-    ipfs_config("Addresses.API",
-            "/ip4/127.0.0.1/tcp/{0}".format(apiport))
-    ipfs_config("Addresses.Gateway",
-            "/ip4/127.0.0.1/tcp/{0}".format(gwport))
-    ipfs_config_json("Addresses.Swarm",
+    ipfs_config('Addresses.API',
+            '/ip4/127.0.0.1/tcp/{0}'.format(apiport))
+    ipfs_config('Addresses.Gateway',
+            '/ip4/127.0.0.1/tcp/{0}'.format(gwport))
+    ipfs_config_json('Addresses.Swarm',
             '["/ip4/127.0.0.1/tcp/{0}"]'.format(swarmport))
 
     # Empty bootstrap so we're not bothered
-    ipfs_config_json("Bootstrap", '[]')
+    ipfs_config_json('Bootstrap', '[]')
+    ipfs_config_json('Experimental.Libp2pStreamMounting', 'true')
+    ipfs_config_json('Experimental.FilestoreEnabled', 'true')
 
     # Run the daemon and wait a bit
     sp = subprocess.Popen(['ipfs', 'daemon'],
@@ -199,11 +201,19 @@ class TestClient:
         await iclient.close()
 
     @pytest.mark.asyncio
-    async def test_p2p(self, event_loop, ipfsdaemon, iclient):
-        with pytest.raises(aioipfs.APIException) as exc:
-            ret = await iclient.p2p.listener_open("test",
-                    "/ip4/127.0.0.1/tcp/10000")
-        assert exc.value.message == 'libp2p stream mounting not enabled'
+    @pytest.mark.parametrize('protocol', ['test'])
+    @pytest.mark.parametrize('address', ['/ip4/127.0.0.1/tcp/10000'])
+    async def test_p2p(self, event_loop, ipfsdaemon, iclient, protocol,
+            address):
+        ret = await iclient.p2p.listener_open(protocol, address)
+        listeners = await iclient.p2p.listener_ls(headers=True)
+        assert len(listeners['Listeners']) > 0
+        assert listeners['Listeners'][0]['Protocol'] == '/p2p/{}'.format(
+                protocol)
+        assert listeners['Listeners'][0]['Address'] == address
+        await iclient.p2p.listener_close(protocol)
+        listeners = await iclient.p2p.listener_ls()
+        assert listeners['Listeners'] is None
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -226,6 +236,11 @@ class TestClient:
         stats = await iclient.bitswap.stat()
         assert 'Wantlist' in stats
         assert 'DataSent' in stats
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_filestore(self, event_loop, ipfsdaemon, iclient):
+        dups = await iclient.filestore.dups()
         await iclient.close()
 
     @pytest.mark.asyncio

@@ -1,5 +1,5 @@
 
-__version__ = '0.2'
+__version__ = '0.3'
 
 from yarl import URL, quoting
 
@@ -38,9 +38,8 @@ class AsyncIPFS(object):
 
         self.loop = loop if loop else asyncio.get_event_loop()
 
-        self.api_url = URL.build(
-                host=host, port=port, scheme='http',
-                path='api/v0/')
+        self.api_url = URL.build(host=host, port=port,
+                scheme='http', path='api/v0/')
 
         self.session = aiohttp.ClientSession(
                 connector=aiohttp.TCPConnector(
@@ -60,6 +59,7 @@ class AsyncIPFS(object):
         self.dag = api.DagAPI(self)
         self.dht = api.DhtAPI(self)
         self.files = api.FilesAPI(self)
+        self.filestore = api.FilestoreAPI(self)
         self.key = api.KeyAPI(self)
         self.pin = api.PinAPI(self)
         self.log = api.LogAPI(self)
