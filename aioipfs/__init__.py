@@ -32,8 +32,8 @@ class AsyncIPFS(object):
     '''
 
     def __init__(self, host='localhost', port=5001, loop=None, **kwargs):
-        self._conns_max = kwargs.get('conns_max', 8)
-        self._conns_max_per_host = kwargs.get('conns_max_per_host', 4)
+        self._conns_max = kwargs.get('conns_max', 0)
+        self._conns_max_per_host = kwargs.get('conns_max_per_host', 0)
         self._read_timeout = kwargs.pop('read_timeout', None)
 
         self.loop = loop if loop else asyncio.get_event_loop()
