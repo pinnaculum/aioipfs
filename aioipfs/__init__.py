@@ -1,5 +1,5 @@
 
-__version__ = '0.3'
+__version__ = '0.3.1'
 
 from yarl import URL, quoting
 
@@ -8,33 +8,41 @@ import aiohttp
 
 from aioipfs import api
 
-# Exceptions
-
-class APIUnknownException(Exception):
+class UnknownAPIException(Exception):
     pass
 
 class APIException(Exception):
-    """ Generic exception raised from SubAPI.fetch_*() """
+    """
+    IPFS API exception
 
-    def __init__(self, code, message):
+    :param int code: IPFS error code
+    :param str message: Error message
+    """
+
+    def __init__(self, code=-1, message='', http_status=-1):
         self.code = code
         self.message = message
+        self.http_status = http_status
 
 class AsyncIPFS(object):
-    ''' Asynchronous IPFS API client using aiohttp and aiofiles
+    """
+    Asynchronous IPFS API client
 
-    Parameters
-    ----------
-    host : str
-        Hostname/IP  of the IPFS daemon to connect to
-    port : int
-        The API port of the IPFS deamon
-    '''
+    :param str host: Hostname/IP of the IPFS daemon to connect to
+    :param int port: The API port of the IPFS deamon
+    :param int conns_max: Maximum HTTP connections for this client
+        (default: 0)
+    :param int conns_max_per_host: Maximum per-host HTTP connections
+        (default: 0)
+    :param int read_timeout: Socket read timeout
+    """
 
-    def __init__(self, host='localhost', port=5001, loop=None, **kwargs):
-        self._conns_max = kwargs.get('conns_max', 0)
-        self._conns_max_per_host = kwargs.get('conns_max_per_host', 0)
-        self._read_timeout = kwargs.pop('read_timeout', None)
+    def __init__(self, host='localhost', port=5001, loop=None,
+            conns_max=0, conns_max_per_host=0, read_timeout=None):
+
+        self._conns_max = conns_max
+        self._conns_max_per_host = conns_max_per_host
+        self._read_timeout = read_timeout
 
         self.loop = loop if loop else asyncio.get_event_loop()
 
@@ -71,7 +79,6 @@ class AsyncIPFS(object):
         self.tar = api.TarAPI(self)
         self.stats = api.StatsAPI(self)
 
-    # Make easy access to the 'core' api
     @property
     def add(self):
         return self.core.add
@@ -79,6 +86,10 @@ class AsyncIPFS(object):
     @property
     def add_bytes(self):
         return self.core.add_bytes
+
+    @property
+    def add_str(self):
+        return self.core.add_str
 
     @property
     def add_json(self):

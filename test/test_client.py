@@ -128,7 +128,8 @@ class TestClient:
     @pytest.mark.asyncio
     async def test_block1(self, event_loop, ipfsdaemon, iclient, testfile1):
         reply = await iclient.block.put(testfile1)
-        reply = await iclient.block.get(reply['Key'])
+        data = await iclient.block.get(reply['Key'])
+        assert data.decode() == testfile1.read()
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -150,11 +151,20 @@ class TestClient:
                 'order': order,
                 'second': second
                 }
-        async for reply in iclient.add_json(json1):
-            h = reply['Hash']
 
-            data = await iclient.cat(h)
-            assert data.decode() == json.dumps(json1)
+        reply = await iclient.add_json(json1)
+        h = reply['Hash']
+
+        data = await iclient.cat(h)
+        assert data.decode() == json.dumps(json1)
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('data', [b'234098dsfkj2doidf0'])
+    async def test_addbytes(self, event_loop, ipfsdaemon, iclient, data):
+        reply = await iclient.add_bytes(data)
+        catD = await iclient.cat(reply['Hash'])
+        assert catD == data
         await iclient.close()
 
     @pytest.mark.asyncio

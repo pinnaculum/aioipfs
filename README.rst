@@ -2,19 +2,17 @@
 aioipfs
 =======
 
-:info: Asynchronous client library for IPFS_
+:info: Asynchronous IPFS_ client library
 
-The **aioipfs** Python package provides asynchronous access to the IPFS_ API,
+The **aioipfs** Python package provides an asynchronous API for IPFS_,
 using Python 3.5's async/await mechanism.
 
 Installation
 ============
 
-PIP package coming soon, for now install with setup.py:
-
 .. code-block:: shell
 
-    python setup.py install
+    pip install aioipfs
 
 Usage examples
 ==============
@@ -38,56 +36,16 @@ Get an IPFS resource
     loop.run_until_complete(get(sys.argv[1]))
     loop.close()
 
-Included tools
-==============
+Pubsub service
+--------------
 
-asyncipfs
----------
+.. code-block:: python
 
-The  **asyncipfs** program implements a few IPFS basic functions (add, get,
-pin, log etc..) with **aioipfs**. You can give multiple hashes parameters and they
-will be processed concurrently, for example:
-
-.. code-block:: shell
-    
-    asyncipfs get hash1 hash2 hash3
-
-ipfs-find
----------
-
-**ipfs-find** allows you to search for content on any IPFS node you have access
-to. It can be useful to recover the hashes of something you've added a while
-ago. Usage:
-
-.. code-block:: shell
-
-    usage: ipfs-find [-h] [--apihost str] [--apiport str] [-j] [-i] [--name NAME]
-                     [--type TYPE] [--contains CONTAINS]
-
-    optional arguments:
-      -h, --help           show this help message and exit
-      --apihost str        IPFS API host
-      --apiport str        IPFS API port
-      -j                   JSON output
-      -i                   Case-insensitive match
-      --name NAME          Match object name
-      --type TYPE          Match object type ('d' for directory, 'f' for file)
-      --contains CONTAINS  Match object content
-
-**Example**: search for files whose name matches 'dmenu.*.c' and which contains
-'size_t', with output in JSON:
-
-.. code-block:: shell
-
-    ipfs-find  --type f --name 'dmenu.*.c$' --contains 'size_t' -j
-    [
-        {
-            "Name": "dmenu.c",
-            "Hash": "Qmb7MGgtGzWn2NQ1PbxhXjZCwNxxuJUSRfMfSL1ZFW2Fwk",
-            "Size": 16926,
-            "Type": 2
-        }
-    ]
+    async def pubsub_serve(topic):
+        async with aioipfs.AsyncIPFS() as cli:
+            async for message in cli.pubsub.sub(topic):
+                print('Received message from', message['from'])
+                await cli.pubsub.pub(topic, message['data'])
 
 Features
 ========
@@ -103,7 +61,6 @@ Requirements
 ============
 
 - Python >= 3.5.3
-- async-timeout_
 - async-generator_
 - aiohttp_
 - aiofiles_
@@ -112,7 +69,6 @@ Requirements
 .. _aiohttp: https://pypi.python.org/pypi/aiohttp
 .. _aiofiles: https://pypi.python.org/pypi/aiofiles
 .. _yarl: https://pypi.python.org/pypi/yarl
-.. _async-timeout: https://pypi.python.org/pypi/async_timeout
 .. _async-generator: https://pypi.python.org/pypi/async_generator
 .. _IPFS: https://ipfs.io
 
@@ -121,7 +77,7 @@ License
 
 **aioipfs** is offered under the GNU GPL3 license.
 
-Authors
-=======
+Author
+======
 
 David Ferlier

@@ -2,6 +2,20 @@
 #
 # Simple tool to search for files/directories on your IPFS node
 #
+# ipfs-find allows you to search for content on any IPFS node you have access
+# to. It can be useful to recover the hashes of something you've added a while
+# ago.
+# 
+# ipfs-find  --type f --name 'dmenu.*.c$' --contains 'size_t' -j
+#     [
+#         {
+#             "Name": "dmenu.c",
+#             "Hash": "Qmb7MGgtGzWn2NQ1PbxhXjZCwNxxuJUSRfMfSL1ZFW2Fwk",
+#             "Size": 16926,
+#             "Type": 2
+#         }
+#     ]
+# 
 
 import sys
 import os
@@ -65,18 +79,18 @@ async def matches(client, obj, **kwargs):
     if find_insensitive:
         reflags = re.IGNORECASE
 
-    if obj['Name']:
-        if find_name:
-            conds['find_name'] = 1
-            ma = re.search(find_name, obj['Name'], reflags)
-            if ma:
-                conds.pop('find_name')
-        if find_type:
-            conds['find_type'] = 1
-            if is_dir(obj) and find_type == 'd':
-                conds.pop('find_type')
-            if is_file(obj) and find_type == 'f':
-                conds.pop('find_type')
+    if find_name:
+        conds['find_name'] = 1
+        ma = re.search(find_name, obj['Name'], reflags)
+        if ma:
+            conds.pop('find_name')
+
+    if find_type:
+        conds['find_type'] = 1
+        if is_dir(obj) and find_type == 'd':
+            conds.pop('find_type')
+        if is_file(obj) and find_type == 'f':
+            conds.pop('find_type')
 
     if is_file(obj) and find_contains:
         conds['find_contains'] = 1
@@ -109,8 +123,10 @@ async def ipfs_walk(client, htracker, results, roothash, parent, **kwargs):
 
     for objs in dir_contents['Objects']:
         for obj in objs['Links']:
+            await asyncio.sleep(0)
             m = await matches(client, obj, **kwargs)
-            if m:
+
+            if m is True:
                 results += obj
 
             obj_hash = obj['Hash']

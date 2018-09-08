@@ -1,7 +1,12 @@
-__pycache__/
+*.swp
+*.bak
+*.egg
+*.egg-info
+*__pycache__/
 *.py[cod]
 *$py.class
 .Python
+.cache
 build/
 dist/
 eggs/
@@ -12,11 +17,9 @@ parts/
 sdist/
 *.egg-info/
 .installed.cfg
+.gitconfig
 *.egg
 MANIFEST
-
-# Installer logs
 pip-log.txt
-
-# Translations
-*.mo
+docs/_build/
+tmp
