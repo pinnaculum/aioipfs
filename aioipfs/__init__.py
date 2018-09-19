@@ -1,5 +1,5 @@
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 from yarl import URL, quoting
 
@@ -8,12 +8,12 @@ import aiohttp
 
 from aioipfs import api
 
-class UnknownAPIException(Exception):
+class UnknownAPIError(Exception):
     pass
 
-class APIException(Exception):
+class APIError(Exception):
     """
-    IPFS API exception
+    IPFS API error
 
     :param int code: IPFS error code
     :param str message: Error message
@@ -43,6 +43,8 @@ class AsyncIPFS(object):
         self._conns_max = conns_max
         self._conns_max_per_host = conns_max_per_host
         self._read_timeout = read_timeout
+        self._host = host
+        self._port = port
 
         self.loop = loop if loop else asyncio.get_event_loop()
 
@@ -66,6 +68,7 @@ class AsyncIPFS(object):
         self.config = api.ConfigAPI(self)
         self.dag = api.DagAPI(self)
         self.dht = api.DhtAPI(self)
+        self.diag = api.DiagAPI(self)
         self.files = api.FilesAPI(self)
         self.filestore = api.FilestoreAPI(self)
         self.key = api.KeyAPI(self)
@@ -78,6 +81,14 @@ class AsyncIPFS(object):
         self.swarm = api.SwarmAPI(self)
         self.tar = api.TarAPI(self)
         self.stats = api.StatsAPI(self)
+
+    @property
+    def host(self):
+        return self._host
+
+    @property
+    def port(self):
+        return self._port
 
     @property
     def add(self):
@@ -106,6 +117,10 @@ class AsyncIPFS(object):
     @property
     def cat(self):
         return self.core.cat
+
+    @property
+    def dns(self):
+        return self.core.dns
 
     @property
     def ls(self):

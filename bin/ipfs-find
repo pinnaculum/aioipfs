@@ -96,7 +96,7 @@ async def matches(client, obj, **kwargs):
         conds['find_contains'] = 1
         try:
             data = await client.cat(obj['Hash'])
-        except aioipfs.APIException as exc:
+        except aioipfs.APIError as exc:
             return False
         try:
             data_decoded = data.decode()
@@ -115,7 +115,7 @@ async def ipfs_walk(client, htracker, results, roothash, parent, **kwargs):
 
     try:
         dir_contents = await client.ls(roothash)
-    except aioipfs.APIException as exc:
+    except aioipfs.APIError as exc:
         return
 
     if not 'Objects' in dir_contents:

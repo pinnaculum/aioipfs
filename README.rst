@@ -29,11 +29,38 @@ Get an IPFS resource
 
     async def get(ipfshash):
         client = aioipfs.AsyncIPFS()
-        await client.get(ipfshash)
+        await client.get(ipfshash, dstdir='.')
         await client.close()
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(get(sys.argv[1]))
+    loop.close()
+
+Add some files
+--------------
+
+This example will import all files and directories specified on the command
+line. Note that the **add** API function is an asynchronous generator and
+therefore needs to be used with the *async for* syntax.
+
+.. code-block:: python
+
+    import sys
+    import asyncio
+
+    import aioipfs
+
+    async def add_files(files):
+        client = aioipfs.AsyncIPFS()
+
+        async for added_file in client.add(*files, recursive=True):
+            print('Imported file {0}, CID: {1}'.format(
+                added_file['Name'], added_file['Hash']))
+
+        await client.close()
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(add_files(sys.argv[1:]))
     loop.close()
 
 Pubsub service
@@ -54,7 +81,7 @@ Async file writing on get operations
 ------------------------------------
 
 The **aiofiles** library is used to asynchronously write data retrieved from
-the IPFS daemon when using the /api/v0/get API call, to avoid blocking the
+the IPFS daemon when using the */api/v0/get* API call, to avoid blocking the
 event loop. TAR extraction is done in asyncio's threadpool.
 
 Requirements

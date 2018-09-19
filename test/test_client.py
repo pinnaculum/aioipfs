@@ -5,7 +5,7 @@ import tempfile
 import random
 import time
 import subprocess
-import os
+import os, os.path
 import json
 import shutil
 
@@ -91,12 +91,10 @@ def ipfs_peerid(ipfsdaemon):
     return ipfs_getconfig_var('Identity.PeerID').strip()
 
 @pytest.fixture()
-def iclient():
-    loop = asyncio.get_event_loop()
-    c = aioipfs.AsyncIPFS(port=apiport, loop=loop)
-    return c
+def iclient(event_loop):
+    return aioipfs.AsyncIPFS(port=apiport, loop=event_loop)
 
-class TestClient:
+class TestAsyncIPFS:
     @pytest.mark.asyncio
     async def test_basic(self, event_loop, ipfsdaemon, iclient):
         tmpdir, sp = ipfsdaemon
@@ -131,6 +129,19 @@ class TestClient:
         data = await iclient.block.get(reply['Key'])
         assert data.decode() == testfile1.read()
         await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_add(self, event_loop, ipfsdaemon, iclient, testfile1,
+            randomfile):
+        count = 0
+        async for added in iclient.add(str(testfile1)):
+            count += 1
+        assert count == 1
+        count = 0
+        all = [[ str(testfile1), str(randomfile)]]
+        async for added in iclient.add(*all):
+            count += 1
+        assert count == 2
 
     @pytest.mark.asyncio
     async def test_addtar(self, event_loop, ipfsdaemon, iclient, tmpdir, smalltar):
@@ -168,14 +179,25 @@ class TestClient:
         await iclient.close()
 
     @pytest.mark.asyncio
-    async def test_dag(self, event_loop, ipfsdaemon, iclient, tmpdir):
-        jsondag = {'dag': 'crash'}
+    @pytest.mark.parametrize('data', [b'234098dsfkj2doidf0'])
+    async def test_dag(self, event_loop, ipfsdaemon, iclient, tmpdir, data):
+        entry = await iclient.add_bytes(data)
+        jsondag = {'dag': {'/': entry['Hash']}}
         filedag = tmpdir.join('jsondag.txt')
         filedag.write(json.dumps(jsondag))
 
         reply = await iclient.dag.put(filedag)
-        back  = await iclient.dag.get(reply['Cid']['/'])
+        path = os.path.join(reply['Cid']['/'], 'dag')
+        raw = await iclient.cat(path)
+        assert raw == data
 
+        back = await iclient.dag.get(path)
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_diag(self, event_loop, ipfsdaemon, iclient, tmpdir):
+        reply = await iclient.diag.sys()
+        assert 'diskinfo' in reply
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -198,7 +220,7 @@ class TestClient:
     async def test_pubsub(self, event_loop, ipfsdaemon, iclient):
         # because we don't have pubsub enabled in the daemon with
         # --enable-pubsub-experiment this should raise an exception
-        with pytest.raises(aioipfs.APIException) as exc:
+        with pytest.raises(aioipfs.APIError) as exc:
             topics = await iclient.pubsub.ls()
             peers  = await iclient.pubsub.peers()
         await iclient.close()

@@ -87,7 +87,7 @@ class SubAPI(object):
             status, textdata = response.status, await response.text()
             if status in HTTP_ERROR_CODES:
                 msg, code = self.decode_error(textdata)
-                raise aioipfs.APIException(code=code, message=msg,
+                raise aioipfs.APIError(code=code, message=msg,
                         http_status=status)
             return textdata
 
@@ -96,7 +96,7 @@ class SubAPI(object):
             status, data = response.status, await response.read()
             if status in HTTP_ERROR_CODES:
                 msg, code = self.decode_error(data)
-                raise aioipfs.APIException(code=code, message=msg,
+                raise aioipfs.APIError(code=code, message=msg,
                         http_status=status)
             return data
 
@@ -105,10 +105,10 @@ class SubAPI(object):
             status, jsondata = response.status, await response.json()
             if status in HTTP_ERROR_CODES:
                 if 'Message' in jsondata and 'Code' in jsondata:
-                    raise aioipfs.APIException(code=jsondata['Code'],
+                    raise aioipfs.APIError(code=jsondata['Code'],
                         message=jsondata['Message'], http_status=status)
                 else:
-                    raise aioipfs.UnknownAPIException()
+                    raise aioipfs.UnknownAPIError()
 
             return jsondata
 
@@ -117,7 +117,7 @@ class SubAPI(object):
         async with self.driver.session.post(url, data=data,
                 headers=headers, params=params) as response:
             if response.status in HTTP_ERROR_CODES:
-                raise aioipfs.APIException(http_status=status)
+                raise aioipfs.APIError(http_status=status)
 
             if outformat == 'text':
                 return await response.text()
@@ -127,13 +127,28 @@ class SubAPI(object):
                 raise Exception('Unknown output format {0}'.format(outformat))
 
     @async_generator
-    async def mjson_decode(self, url, params={}):
+    async def mjson_decode(self, url, method='get', data=None, params={}):
         """
         Multiple JSON objects response decoder (async generator), used for
         the API endpoints which return multiple JSON messages
+
+        :param str method: http method, get or post
+        :param data: data, for POST only
+        :param params: http params
         """
 
-        async with self.driver.session.get(url, params=params) as response:
+        fn = None
+        kwargs = {'params': params}
+        if method == 'get':
+            fn = self.driver.session.get
+        elif method == 'post':
+            fn = self.driver.session.post
+            if data is not None:
+                kwargs['data'] = data
+        else:
+            raise ValueError('mjson_decode: unknown method')
+
+        async with fn(url, **kwargs) as response:
             async for raw_message in response.content:
                 message = decode_json(raw_message)
                 if message is not None:
@@ -331,6 +346,9 @@ class BootstrapAPI(SubAPI):
         }
         return await self.fetch_json(self.url('bootstrap/add'), params=params)
 
+    async def add_default(self):
+        return await self.fetch_json(self.url('bootstrap/add/default'))
+
     async def list(self):
         """ Shows peers in the bootstrap list """
         return await self.fetch_json(self.url('bootstrap/list'))
@@ -343,7 +361,7 @@ class BootstrapAPI(SubAPI):
             params['all'] = boolarg(all)
         return await self.fetch_json(self.url('bootstrap/rm'), params=params)
 
-    async def rmall(self):
+    async def rm_all(self):
         """ Removes all peers in the bootstrap list """
         return await self.fetch_json(self.url('bootstrap/rm/all'))
 
@@ -373,11 +391,24 @@ class ConfigAPI(SubAPI):
                     data=mpwriter, outformat='text')
 
 class DagAPI(SubAPI):
-    # /dag/*
+    async def put(self, filename, format='cbor', input_enc='json', pin=False):
+        """
+        Add a DAG node to IPFS
 
-    async def put(self, filename):
+        :param str filename: a path to the object to import
+        :param str format: format to use for the object inside IPFS
+        :param str input_enc: object input encoding
+        :param bool pin: pin the object after adding (default is False)
+        """
+
         if not os.path.isfile(filename):
             raise Exception('dag put: {} file does not exist'.format(filename))
+
+        params = {
+                'format': format,
+                'input-enc': input_enc,
+                'pin': boolarg(pin)
+        }
 
         basename = os.path.basename(filename)
         with multi.FormDataWriter() as mpwriter:
@@ -387,19 +418,29 @@ class DagAPI(SubAPI):
             mpwriter.append_payload(dag_payload)
 
             return await self.post(self.url('dag/put'), mpwriter,
-                    outformat='json')
+                    params=params, outformat='json')
 
-    async def get(self, multihash):
+    async def get(self, objpath):
+        """
+        Get a DAG node from IPFS
+
+        :param str objpath: path of the object to fetch
+        """
+
         return await self.fetch_text(self.url('dag/get'),
-                params={ARG_PARAM: multihash})
+                params={ARG_PARAM: objpath})
 
-    async def resolve(self, multihash):
-        return await self.fetch_text(self.url('dag/resolve'),
-                params={ARG_PARAM: multihash})
+    async def resolve(self, path):
+        """
+        Resolve an IPLD block
+
+        :param str path: path to resolve
+        """
+
+        return await self.fetch_json(self.url('dag/resolve'),
+                params={ARG_PARAM: path})
 
 class DhtAPI(SubAPI):
-    # /dht/*
-
     async def findpeer(self, peerid, verbose=False):
         return await self.fetch_json(self.url('dht/findpeer'),
                 params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)})
@@ -435,6 +476,13 @@ class DhtAPI(SubAPI):
         async for value in self.mjson_decode(self.url('dht/query'),
                 params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}):
             await yield_(value)
+
+class DiagAPI(SubAPI):
+    async def sys(self):
+        return await self.fetch_json(self.url('diag/sys'))
+
+    async def cmds_clear(self):
+        return await self.fetch_text(self.url('diag/cmds/clear'))
 
 class FilesAPI(SubAPI):
     async def cp(self, source, dest):
@@ -512,11 +560,33 @@ class KeyAPI(SubAPI):
 class LogAPI(SubAPI):
     @async_generator
     async def tail(self):
+        """
+        Read the event log.
+
+        async for event in client.log.tail():
+            ...
+        """
+
         async for log in self.mjson_decode(self.url('log/tail')):
             await yield_(log)
 
     async def ls(self):
+        """ List the logging subsystems """
         return await self.fetch_json(self.url('log/ls'))
+
+    async def level(self, subsystem='all', level='debug'):
+        """
+        Change logging level
+
+        :param str subsystem: The subsystem logging identifier.
+            Use ‘all’ for all subsystems.
+        :param str level: The log level, with ‘debug’ the most verbose
+            and ‘critical’ the least verbose. One of: debug, info, warning,
+            error, critical. Required: yes.
+        """
+
+        return await self.fetch_json(self.url('log/level'),
+            params=quote_args(subsystem, level))
 
 class NameAPI(SubAPI):
     async def publish(self, path, resolve=True, lifetime='24h', key='self'):
@@ -566,12 +636,12 @@ class ObjectAPI(SubAPI):
 
 class PinAPI(SubAPI):
     @async_generator
-    async def add(self, multihash, recursive=True):
+    async def add(self, multihash, recursive=True, progress=True):
         # We request progress status by default
         params = {
             ARG_PARAM: multihash,
             'recursive': boolarg(recursive),
-            'progress': boolarg(True)
+            'progress': boolarg(progress)
         }
 
         async for added in self.mjson_decode(
@@ -591,9 +661,9 @@ class PinAPI(SubAPI):
 
     async def rm(self, multihash, recursive=True):
         params = {
-                ARG_PARAM: multihash,
-                'recursive': boolarg(recursive)
-                }
+            ARG_PARAM: multihash,
+            'recursive': boolarg(recursive)
+        }
         return await self.fetch_json(self.url('pin/rm'),
             params=params)
 
@@ -679,9 +749,9 @@ class RefsAPI(SubAPI):
 class RepoAPI(SubAPI):
     async def gc(self, quiet=False, streamerrors=False):
         params = {
-                'quiet': boolarg(quiet),
-                'stream-errors': boolarg(streamerrors)
-                }
+            'quiet': boolarg(quiet),
+            'stream-errors': boolarg(streamerrors)
+        }
         return await self.fetch_text(self.url('repo/gc'),
             params=params)
 
@@ -718,6 +788,16 @@ class SwarmAPI(SubAPI):
     async def disconnect(self, peer):
         params = {ARG_PARAM: peer}
         return await self.fetch_json(self.url('swarm/disconnect'),
+                params=params)
+
+    async def filters_add(self, filter):
+        params = {ARG_PARAM: filter}
+        return await self.fetch_json(self.url('swarm/filters/add'),
+                params=params)
+
+    async def filters_rm(self, filter):
+        params = {ARG_PARAM: filter}
+        return await self.fetch_json(self.url('swarm/filters/rm'),
                 params=params)
 
 class TarAPI(SubAPI):
@@ -767,15 +847,13 @@ class CoreAPI(SubAPI):
     @async_generator
     async def add_generic(self, mpart, params={}):
         """
-        Add a multiple-entry multipart, and yields the JSON message for every
-        entry added
+        Add a multiple-entry multipart, and yield the JSON message for every
+        entry added. We use mjson_decode with the post method.
         """
 
-        async with self._add_post(mpart, params=params) as response:
-            async for message in response.content:
-                added = decode_json(message)
-                if added:
-                    await yield_(added)
+        async for added in self.mjson_decode(self.url('add'),
+                method='post', data=mpart, params=params):
+            await yield_(added)
 
     async def add_bytes(self, data):
         """
@@ -803,14 +881,17 @@ class CoreAPI(SubAPI):
         return await self.add_single(multi.multiform_json(data))
 
     @async_generator
-    async def add(self, files, **kwargs):
+    async def add(self, *files, recursive=False, quiet=False, quieter=False,
+            silent=False, progress=False, trickle=False, fscache=False,
+            only_hash=False, wrap_with_directory=False, pin=True,
+            raw_leaves=False, nocopy=False, hidden=False):
         """
         Add a file or directory to ipfs.
 
         This is an async generator yielding an IPFS entry for every file added.
 
-        :param files: A list of paths to files/directories to be added to
-            the IPFS repository, or a filepath to a file/directory
+        :param files: A list of files/directories to be added to
+            the IPFS repository
         :param bool recursive: Add directory paths recursively.
         :param bool quiet: Write minimal output.
         :param bool quieter: Write only final hash.
@@ -822,33 +903,44 @@ class CoreAPI(SubAPI):
         :param bool pin: Pin this object when adding. Default: true.
         :param bool raw_leaves: Use raw blocks for leaf nodes.
         :param bool nocopy: Add the file using filestore.
+        :param bool fscache: Check the filestore for preexisting blocks.
         :param bool hidden: Include files that are hidden. Only takes effect on
             recursive add.
         """
 
         params = {
-            'trickle': boolarg(kwargs.pop('trickle', False)),
-            'only-hash': boolarg(kwargs.pop('only_hash', False)),
-            'wrap-with-directory': boolarg(kwargs.pop('wrap_with_directory', False)),
-            'pin': boolarg(kwargs.pop('pin', True)),
-            'hidden': boolarg(kwargs.pop('hidden', False)),
-            'quiet': boolarg(kwargs.pop('quiet', False)),
-            'quieter': boolarg(kwargs.pop('quieter', False)),
-            'silent': boolarg(kwargs.pop('silent', False)),
-            'raw-leaves': boolarg(kwargs.pop('raw_leaves', False)),
-            'nocopy': boolarg(kwargs.pop('nocopy', False)),
-            'recursive': boolarg(kwargs.pop('recursive', False))
+            'trickle': boolarg(trickle),
+            'only-hash': boolarg(only_hash),
+            'wrap-with-directory': boolarg(wrap_with_directory),
+            'pin': boolarg(pin),
+            'hidden': boolarg(hidden),
+            'quiet': boolarg(quiet),
+            'quieter': boolarg(quieter),
+            'silent': boolarg(silent),
+            'raw-leaves': boolarg(raw_leaves),
+            'nocopy': boolarg(nocopy),
+            'fscache': boolarg(fscache),
+            'recursive': boolarg(recursive)
         }
 
-        if isinstance(files, str):
-            files = [files]
+        all_files = []
+        for fitem in files:
+            if isinstance(fitem, list):
+                all_files += fitem
+            elif isinstance(fitem, str):
+                all_files.append(fitem)
 
         # Build the multipart form and add the files/directories
         with multi.FormDataWriter() as mpwriter:
-            for filepath in files:
+            for filepath in all_files:
                 await asyncio.sleep(0)
+
+                if not isinstance(filepath, str):
+                    continue
+
                 if not os.path.exists(filepath):
                     continue
+
                 if os.path.isdir(filepath):
                     dir_listing = multi.DirectoryListing(filepath)
                     names = dir_listing.genNames()
@@ -901,27 +993,28 @@ class CoreAPI(SubAPI):
         params = {ARG_PARAM: multihash}
         return await self.fetch_raw(self.url('cat'), params=params)
 
-    async def get(self, multihash, dstdir='.', *args, **kwargs):
+    async def get(self, multihash, dstdir='.', compress=False,
+            compression_level=-1, archive=True,
+            progress_callback=None, progress_callback_arg=None,
+            chunk_size=16384):
         """
         Download IPFS objects.
 
         :param str multihash: The base58 multihash of the object to retrieve
         :param str dstdir: destination directory, current directory by default
-        :param str compress: Compress the output with GZIP compression
+        :param bool compress: Compress the output with GZIP compression
         :param str compression_level: The level of compression (1-9)
-        :param str archive: Output a TAR archive
+        :param bool archive: Output a TAR archive
         """
 
         opts = {
             ARG_PARAM: multihash,
-            'compress': boolarg(kwargs.pop('compress', False)),
-            'compression-level': str(kwargs.pop('compression_level', -1)),
-            'archive': boolarg(True)
+            'compress': boolarg(compress),
+            'compression-level': str(compression_level),
+            'archive': boolarg(archive)
         }
-        progress_callback = kwargs.pop('progress_callback', None)
-        progress_callback_arg = kwargs.pop('progress_callback_arg', None)
-        default_chunk_size = 16384
-        chunk_size = kwargs.pop('chunk_size', default_chunk_size)
+        progress_callback = progress_callback
+        progress_callback_arg = progress_callback_arg
 
         archive_path = tempfile.mkstemp(prefix='aioipfs')[1]
 
@@ -943,8 +1036,7 @@ class CoreAPI(SubAPI):
                     if not chunk:
                         break
 
-                    chunk_size = len(chunk)
-                    read_so_far += chunk_size
+                    read_so_far += len(chunk)
 
                     if callable(progress_callback):
                         await progress_callback(multihash, read_so_far,
@@ -997,6 +1089,7 @@ class CoreAPI(SubAPI):
         }
         return await self.fetch_json(self.url('mount'), params=params)
 
+    @async_generator
     async def ping(self, peerid, count=5):
         """
         Send echo request packets to IPFS hosts.
@@ -1005,8 +1098,9 @@ class CoreAPI(SubAPI):
         :param int count: Number of ping messages to send
         """
 
-        return await self.fetch_text(self.url('ping'),
-            params={ARG_PARAM: peerid, 'count': str(count)})
+        async for value in self.mjson_decode(self.url('ping'),
+                params={ARG_PARAM: peerid, 'count': str(count)}):
+            await yield_(value)
 
     async def shutdown(self):
         """ Shut down the ipfs daemon """
@@ -1015,3 +1109,16 @@ class CoreAPI(SubAPI):
     async def version(self):
         """ Show ipfs version information """
         return await self.fetch_json(self.url('version'))
+
+    async def dns(self, name, recursive=False):
+        """
+        Resolve DNS links
+
+        :param str name: domain name to resolve
+        :param bool recursive: Resolve until the result is not a DNS link.
+        """
+        params = {
+            ARG_PARAM: name,
+            'recursive': boolarg(recursive)
+        }
+        return await self.fetch_json(self.url('dns'), params=params)
