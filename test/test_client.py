@@ -201,6 +201,16 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize('data', [b'0123456789'])
+    async def test_catoffset(self, event_loop, ipfsdaemon, iclient, tmpdir, data):
+        entry = await iclient.add_bytes(data)
+        raw = await iclient.cat(entry['Hash'], offset=4)
+        assert raw.decode() == '456789'
+        raw = await iclient.cat(entry['Hash'], offset=2, length=3)
+        assert raw.decode() == '234'
+        await iclient.close()
+
+    @pytest.mark.asyncio
     async def test_multiget(self, event_loop, ipfsdaemon,
             iclient, randomfile, tmpdir):
         hashes = []
@@ -273,6 +283,36 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     async def test_filestore(self, event_loop, ipfsdaemon, iclient):
         dups = await iclient.filestore.dups()
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('obj1', [b'0123456789'])
+    @pytest.mark.parametrize('obj2', [b'0a1b2c3d4e5'])
+    async def test_object(self, event_loop, ipfsdaemon, iclient, obj1, obj2,
+            randomfile):
+        """ Unsure if this is correct """
+        obj1Ent = await iclient.add_bytes(obj1)
+        obj2Ent = await iclient.add_bytes(obj2)
+        obj = await iclient.object.new()
+        r1 = await iclient.object.patch.add_link(obj['Hash'], 'obj1',
+                obj1Ent['Hash'])
+        r2 = await iclient.object.patch.add_link(r1['Hash'], 'obj2',
+                obj2Ent['Hash'])
+
+        dag = await iclient.object.get(r2['Hash'])
+        assert len(dag['Links']) == 2
+        data1 = await iclient.cat(dag['Links'][0]['Hash'])
+        data2 = await iclient.cat(dag['Links'][1]['Hash'])
+
+        assert data1 == obj1
+        assert data2 == obj2
+
+        with pytest.raises(aioipfs.APIError):
+            await iclient.object.patch.rm_link(obj['Hash'], 'obj1')
+
+        rm = await iclient.object.patch.rm_link(r2['Hash'], 'obj1')
+        dag = await iclient.object.get(rm['Hash'])
+        assert len(dag['Links']) == 1
         await iclient.close()
 
     @pytest.mark.asyncio

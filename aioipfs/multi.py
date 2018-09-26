@@ -26,6 +26,13 @@ def multiform_json(json):
         mpwriter.append_payload(part)
         return mpwriter
 
+def bytes_payload_from_file(filepath):
+    basename = os.path.basename(filepath)
+    file_payload = payload.BytesIOPayload(open(filepath, 'rb'))
+    file_payload.set_content_disposition('form-data',
+            filename=basename)
+    return file_payload
+
 def glob_compile(pat):
     """ From ipfsapi.multipart
 
