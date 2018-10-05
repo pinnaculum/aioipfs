@@ -35,7 +35,7 @@ def testfile1(tmpdir):
     return filep
 
 @pytest.fixture
-def randomfile(tmpdir):
+def testfile2(tmpdir):
     r = random.Random()
     filep = tmpdir.join('testfile2.txt')
     for i in range(0, 128):
@@ -132,16 +132,17 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_add(self, event_loop, ipfsdaemon, iclient, testfile1,
-            randomfile):
+            testfile2):
         count = 0
         async for added in iclient.add(str(testfile1)):
             count += 1
         assert count == 1
         count = 0
-        all = [[ str(testfile1), str(randomfile)]]
+        all = [[ str(testfile1), str(testfile2)]]
         async for added in iclient.add(*all):
             count += 1
         assert count == 2
+        await iclient.close()
 
     @pytest.mark.asyncio
     async def test_addtar(self, event_loop, ipfsdaemon, iclient, tmpdir, smalltar):
@@ -212,13 +213,13 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_multiget(self, event_loop, ipfsdaemon,
-            iclient, randomfile, tmpdir):
+            iclient, testfile2, tmpdir):
         hashes = []
 
-        # Create 16 variations of randomfile and add them to the node
+        # Create 16 variations of testfile2 and add them to the node
         for idx in range(0, 16):
-            randomfile.write('ABCD' + str(idx))
-            async for reply in iclient.add(str(randomfile)):
+            testfile2.write('ABCD' + str(idx))
+            async for reply in iclient.add(str(testfile2)):
                 hashes.append(reply['Hash'])
 
         # Get them all back concurrently
@@ -286,10 +287,35 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize('obj', [b'0123456789'])
+    async def test_files_rw(self, event_loop, ipfsdaemon, iclient, obj,
+            testfile1, testfile2):
+        # Write obj (bytes) to /test1
+        ret = await iclient.files.write('/test1', obj, create=True)
+        data = await iclient.files.read('/test1')
+        assert data == obj
+
+        # Write testfile1 to /test2
+        ret = await iclient.files.write('/test2', str(testfile1), create=True)
+        data = await iclient.files.read('/test2')
+        filedata = testfile1.read()
+        assert data.decode() == filedata
+
+        # Write testfile2 to /test3, then write 123 at some offset
+        # and read the file again starting from that offset
+        resp = await iclient.files.write('/test3', str(testfile2), create=True)
+        otro = b'123'
+        resp = await iclient.files.write('/test3', otro, create=True,
+                offset=5)
+        data = await iclient.files.read('/test3', offset=5, count=3)
+        assert data == otro
+        await iclient.close()
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize('obj1', [b'0123456789'])
     @pytest.mark.parametrize('obj2', [b'0a1b2c3d4e5'])
     async def test_object(self, event_loop, ipfsdaemon, iclient, obj1, obj2,
-            randomfile):
+            testfile2):
         """ Unsure if this is correct """
         obj1Ent = await iclient.add_bytes(obj1)
         obj2Ent = await iclient.add_bytes(obj2)

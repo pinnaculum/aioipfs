@@ -138,7 +138,9 @@ class SubAPI(object):
         async with self.driver.session.post(url, data=data,
                 headers=headers, params=params) as response:
             if response.status in HTTP_ERROR_CODES:
-                raise aioipfs.APIError(http_status=response.status)
+                errtext = await response.read()
+                raise aioipfs.APIError(message=errtext,
+                        http_status=response.status)
 
             if outformat == 'text':
                 return await response.text()
@@ -172,8 +174,15 @@ class SubAPI(object):
         async with fn(url, **kwargs) as response:
             async for raw_message in response.content:
                 message = decode_json(raw_message)
+
                 if message is not None:
-                    await yield_(message)
+                    if 'Message' in message and 'Code' in message:
+                        raise aioipfs.APIError(code=message['Code'],
+                            message=message['Message'],
+                            http_status=response.status)
+                    else:
+                        await yield_(message)
+
                 await asyncio.sleep(0)
 
 class P2PAPI(SubAPI):
@@ -552,7 +561,7 @@ class FilesAPI(SubAPI):
         if count is not None and isinstance(count, int):
             params['count'] = count
 
-        return await self.fetch_json(self.url('files/read'),
+        return await self.fetch_raw(self.url('files/read'),
                 params=params)
 
     async def rm(self, path, recursive=False):
@@ -568,6 +577,46 @@ class FilesAPI(SubAPI):
         }
         return await self.fetch_json(self.url('files/stat'),
                 params=params)
+
+    async def write(self, mfspath, data, create=False,
+            truncate=False, offset=-1, count=-1):
+        """
+        Write to a mutable file in a given filesystem.
+
+        :param str mfspath: Path to write to
+        :param data: Data to write, can be a filepath or bytes data
+        :param int offset: Byte offset to begin writing at
+        :param bool create: Create the file if it does not exist
+        :param bol truncate: Truncate the file to size zero before writing
+        :param int count: Maximum number of bytes to read
+        """
+
+        params = {
+            ARG_PARAM: mfspath,
+            'create': boolarg(create),
+            'truncate': boolarg(truncate)
+        }
+
+        if isinstance(offset, int) and offset > 0:
+            params['offset'] = offset
+        if isinstance(count, int) and count > 0:
+            params['count'] = count
+
+        if isinstance(data, bytes):
+            file_payload = payload.BytesPayload(data)
+            file_payload.set_content_disposition('form-data', name='data',
+                    filename='data')
+        elif isinstance(data, str):
+            # Filepath
+            file_payload = multi.bytes_payload_from_file(data)
+        else:
+            raise ValueError('Unknown data format')
+
+        with multi.FormDataWriter() as mpwriter:
+            mpwriter.append_payload(file_payload)
+
+            return await self.post(self.url('files/write'),
+                    mpwriter, params=params, outformat='text')
 
 class FilestoreAPI(SubAPI):
     async def dups(self):
@@ -794,6 +843,10 @@ class ObjectAPI(SubAPI):
 class PinAPI(SubAPI):
     @async_generator
     async def add(self, multihash, recursive=True, progress=True):
+        """
+        Pin objects to local storage.
+        """
+
         # We request progress status by default
         params = {
             ARG_PARAM: multihash,
@@ -806,6 +859,10 @@ class PinAPI(SubAPI):
             await yield_(added)
 
     async def ls(self, multihash=None, pintype='all', quiet=False):
+        """
+        List objects pinned to local storage.
+        """
+
         params = {
             'type': pintype,
             'quiet': boolarg(quiet)
@@ -817,6 +874,10 @@ class PinAPI(SubAPI):
             params=params)
 
     async def rm(self, multihash, recursive=True):
+        """
+        Remove pinned objects from local storage.
+        """
+
         params = {
             ARG_PARAM: multihash,
             'recursive': boolarg(recursive)
@@ -825,12 +886,31 @@ class PinAPI(SubAPI):
             params=params)
 
     async def verify(self, verbose=False, quiet=True):
+        """
+        Verify that recursive pins are complete.
+        """
+
         params = {
             'verbose': boolarg(verbose),
             'quiet': boolarg(quiet)
         }
         return await self.fetch_json(self.url('pin/verify'),
             params=params)
+
+    async def update(self, old, new, unpin=True):
+        """
+        Update a recursive pin
+
+        :param str old: Path to old object
+        :param str new: Path to new object
+        :param bool unpin: Remove the old pin
+        """
+
+        params = quote_dict({
+            ARG_PARAM: [old, new],
+            'unpin': boolarg(unpin)
+        })
+        return await self.fetch_json(self.url('pin/update'), params=params)
 
 class PubSubAPI(SubAPI):
     async def ls(self):
