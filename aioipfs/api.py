@@ -1,13 +1,13 @@
 
-import base58, base64
 import json
 import os.path
 import tarfile
 import tempfile
 import sys
+import base58, base64
+from urllib.parse import quote
 
 import asyncio
-import async_timeout
 import aiohttp
 import aiofiles
 import aioipfs
@@ -18,7 +18,7 @@ from aiohttp.web_exceptions import (HTTPOk,
         HTTPSuccessful, HTTPInternalServerError,
         HTTPServerError, HTTPBadRequest)
 
-from yarl import URL, quoting
+from yarl import URL
 from async_generator import async_generator, yield_, yield_from_
 
 from . import multi
@@ -33,16 +33,14 @@ def boolarg(arg):
 def quote_args(*args):
     # Used in the few cases where there are multiple 'arg=' URL params
     # that yarl can't handle at the moment
-    quoter = quoting._Quoter()
     quoted = ''
 
     if len(args) >  0:
         for arg in args:
-            quoted += '&{0}={1}'.format(ARG_PARAM, quoter(str(arg)))
+            quoted += '&{0}={1}'.format(ARG_PARAM, quote(str(arg)))
         return quoted[1:]
 
 def quote_dict(data):
-    quoter = quoting._Quoter()
     quoted = ''
 
     if not isinstance(data, dict):
@@ -51,13 +49,13 @@ def quote_dict(data):
     for arg, value in data.items():
         if isinstance(value, list):
             for lvalue in value:
-                quoted += '&{0}={1}'.format(arg, quoter(str(lvalue)))
+                quoted += '&{0}={1}'.format(arg, quote(str(lvalue)))
         elif isinstance(value, str):
-            quoted += '&{0}={1}'.format(arg, quoter(value))
+            quoted += '&{0}={1}'.format(arg, quote(value))
         elif isinstance(value, int):
-            quoted += '&{0}={1}'.format(arg, quoter(str(value)))
+            quoted += '&{0}={1}'.format(arg, quote(str(value)))
         elif isinstance(value, bool):
-            quoted += '&{0}={1}'.format(arg, quoter(boolarg(value)))
+            quoted += '&{0}={1}'.format(arg, quote(boolarg(value)))
 
     if len(quoted) > 0:
         return quoted[1:]

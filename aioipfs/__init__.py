@@ -1,7 +1,7 @@
 
-__version__ = '0.3.4'
+__version__ = '0.3.5'
 
-from yarl import URL, quoting
+from yarl import URL
 
 import asyncio
 import aiohttp
