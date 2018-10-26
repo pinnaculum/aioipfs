@@ -4,8 +4,7 @@ aioipfs
 
 :info: Asynchronous IPFS_ client library
 
-The **aioipfs** Python package provides an asynchronous API for IPFS_,
-using Python 3.5's async/await mechanism.
+**aioipfs** is a python3 library providing an asynchronous API for IPFS_,
 
 Installation
 ============
