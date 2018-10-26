@@ -1,25 +1,22 @@
-
 import json
 import os.path
 import tarfile
 import tempfile
 import sys
-import base58, base64
+import base58
+import base64
 from urllib.parse import quote
 
 import asyncio
-import aiohttp
 import aiofiles
 import aioipfs
 
-from aiohttp import payload, multipart, web_exceptions
-from aiohttp.web_exceptions import (HTTPOk,
-        HTTPPartialContent, HTTPError,
-        HTTPSuccessful, HTTPInternalServerError,
-        HTTPServerError, HTTPBadRequest)
+from aiohttp import payload
+from aiohttp.web_exceptions import (HTTPError,
+                                    HTTPInternalServerError,
+                                    HTTPServerError, HTTPBadRequest)
 
-from yarl import URL
-from async_generator import async_generator, yield_, yield_from_
+from async_generator import async_generator, yield_
 
 from . import multi
 
@@ -27,18 +24,21 @@ from . import multi
 
 ARG_PARAM = 'arg'
 
+
 def boolarg(arg):
     return str(arg).lower()
+
 
 def quote_args(*args):
     # Used in the few cases where there are multiple 'arg=' URL params
     # that yarl can't handle at the moment
     quoted = ''
 
-    if len(args) >  0:
+    if len(args) > 0:
         for arg in args:
             quoted += '&{0}={1}'.format(ARG_PARAM, quote(str(arg)))
         return quoted[1:]
+
 
 def quote_dict(data):
     quoted = ''
@@ -60,24 +60,29 @@ def quote_dict(data):
     if len(quoted) > 0:
         return quoted[1:]
 
+
 def decode_json(data):
     if not data:
         return None
     try:
         json_obj = json.loads(data.decode())
     except Exception as exc:
+        print(data)
         print('Could not read JSON object:', str(exc), file=sys.stderr)
         return None
 
     return json_obj
 
+
 HTTP_ERROR_CODES = [
     HTTPInternalServerError.status_code,
     HTTPBadRequest.status_code,
+    HTTPError.status_code,
     HTTPServerError.status_code
 ]
 
 DEFAULT_TIMEOUT = 60 * 60
+
 
 class SubAPI(object):
     """
@@ -95,10 +100,10 @@ class SubAPI(object):
     def decode_error(self, errormsg):
         try:
             decoded_json = json.loads(errormsg)
-            msg  = decoded_json['Message']
+            msg = decoded_json['Message']
             code = decoded_json['Code']
             return msg, code
-        except Exception as e:
+        except Exception:
             return None, None
 
     async def fetch_text(self, url, params={}, timeout=DEFAULT_TIMEOUT):
@@ -107,7 +112,7 @@ class SubAPI(object):
             if status in HTTP_ERROR_CODES:
                 msg, code = self.decode_error(textdata)
                 raise aioipfs.APIError(code=code, message=msg,
-                        http_status=status)
+                                       http_status=status)
             return textdata
 
     async def fetch_raw(self, url, params={}, timeout=DEFAULT_TIMEOUT):
@@ -116,7 +121,7 @@ class SubAPI(object):
             if status in HTTP_ERROR_CODES:
                 msg, code = self.decode_error(data)
                 raise aioipfs.APIError(code=code, message=msg,
-                        http_status=status)
+                                       http_status=status)
             return data
 
     async def fetch_json(self, url, params={}, timeout=DEFAULT_TIMEOUT):
@@ -124,21 +129,24 @@ class SubAPI(object):
             status, jsondata = response.status, await response.json()
             if status in HTTP_ERROR_CODES:
                 if 'Message' in jsondata and 'Code' in jsondata:
-                    raise aioipfs.APIError(code=jsondata['Code'],
-                        message=jsondata['Message'], http_status=status)
+                    raise aioipfs.APIError(
+                        code=jsondata['Code'],
+                        message=jsondata['Message'],
+                        http_status=status)
                 else:
                     raise aioipfs.UnknownAPIError()
 
             return jsondata
 
     async def post(self, url, data, headers={}, params={},
-            timeout=DEFAULT_TIMEOUT, outformat='text'):
+                   timeout=DEFAULT_TIMEOUT, outformat='text'):
         async with self.driver.session.post(url, data=data,
-                headers=headers, params=params) as response:
+                                            headers=headers,
+                                            params=params) as response:
             if response.status in HTTP_ERROR_CODES:
                 errtext = await response.read()
                 raise aioipfs.APIError(message=errtext,
-                        http_status=response.status)
+                                       http_status=response.status)
 
             if outformat == 'text':
                 return await response.text()
@@ -176,12 +184,13 @@ class SubAPI(object):
                 if message is not None:
                     if 'Message' in message and 'Code' in message:
                         raise aioipfs.APIError(code=message['Code'],
-                            message=message['Message'],
-                            http_status=response.status)
+                                               message=message['Message'],
+                                               http_status=response.status)
                     else:
                         await yield_(message)
 
                 await asyncio.sleep(0)
+
 
 class P2PAPI(SubAPI):
     async def listener_open(self, protocol, address):
@@ -192,7 +201,7 @@ class P2PAPI(SubAPI):
         :param str address: address for the listener, in multiaddr format
         """
         return await self.fetch_json(self.url('p2p/listener/open'),
-                params=quote_args(protocol, address))
+                                     params=quote_args(protocol, address))
 
     async def listener_close(self, protocol, all=False):
         """
@@ -207,7 +216,7 @@ class P2PAPI(SubAPI):
             'all': boolarg(all)
         }
         return await self.fetch_json(self.url('p2p/listener/close'),
-                params=params)
+                                     params=params)
 
     async def listener_ls(self, headers=False):
         """
@@ -217,7 +226,7 @@ class P2PAPI(SubAPI):
         """
 
         return await self.fetch_json(self.url('p2p/listener/ls'),
-                params={'headers': boolarg(headers)})
+                                     params={'headers': boolarg(headers)})
 
     async def stream_dial(self, peer, protocol, address=None):
         """
@@ -232,7 +241,7 @@ class P2PAPI(SubAPI):
         args = [peer, protocol, address] if address else [peer, protocol]
         params = quote_args(*args)
         return await self.fetch_json(self.url('p2p/stream/dial'),
-                params=params)
+                                     params=params)
 
     async def stream_close(self, streamid, all=False):
         """
@@ -240,14 +249,15 @@ class P2PAPI(SubAPI):
         """
 
         return await self.fetch_text(self.url('p2p/stream/close'),
-                params={ARG_PARAM: streamid})
+                                     params={ARG_PARAM: streamid})
 
     async def stream_ls(self, headers=False):
         """
         List active P2P streams.
         """
         return await self.fetch_json(self.url('p2p/stream/ls'),
-                params={'headers': boolarg(headers)})
+                                     params={'headers': boolarg(headers)})
+
 
 class BitswapAPI(SubAPI):
     async def ledger(self, peer):
@@ -258,7 +268,7 @@ class BitswapAPI(SubAPI):
         """
 
         return await self.fetch_json(self.url('bitswap/ledger'),
-            params={ARG_PARAM: peer})
+                                     params={ARG_PARAM: peer})
 
     async def reprovide(self):
         """
@@ -283,7 +293,7 @@ class BitswapAPI(SubAPI):
 
         params = {ARG_PARAM: peer} if peer else {}
         return await self.fetch_json(self.url('bitswap/wantlist'),
-            params=params)
+                                     params=params)
 
     async def unwant(self, block):
         """
@@ -293,7 +303,8 @@ class BitswapAPI(SubAPI):
         """
 
         return await self.fetch_json(self.url('bitswap/unwant'),
-            params={ARG_PARAM: block})
+                                     params={ARG_PARAM: block})
+
 
 class BlockAPI(SubAPI):
     async def get(self, multihash):
@@ -305,7 +316,7 @@ class BlockAPI(SubAPI):
         """
 
         return await self.fetch_raw(self.url('block/get'),
-            params={ARG_PARAM: multihash})
+                                    params={ARG_PARAM: multihash})
 
     async def rm(self, multihash, force=False, quiet=False):
         """
@@ -332,7 +343,7 @@ class BlockAPI(SubAPI):
         """
 
         return await self.fetch_json(self.url('block/stat'),
-            params={ARG_PARAM: multihash})
+                                     params={ARG_PARAM: multihash})
 
     async def put(self, filepath, format='v0', mhtype='sha2-256', mhlen=-1):
         """
@@ -357,13 +368,15 @@ class BlockAPI(SubAPI):
 
         with multi.FormDataWriter() as mpwriter:
             block_payload = payload.BytesIOPayload(open(filepath, 'rb'))
-            block_payload.set_content_disposition('form-data',
-                    filename=os.path.basename(filepath))
+            block_payload.set_content_disposition(
+                'form-data', filename=os.path.basename(filepath))
             mpwriter.append_payload(block_payload)
 
             async with self.driver.session.post(self.url('block/put'),
-                    data=mpwriter) as response:
+                                                data=mpwriter,
+                                                params=params) as response:
                 return await response.json()
+
 
 class BootstrapAPI(SubAPI):
     """ Bootstrap API """
@@ -394,6 +407,7 @@ class BootstrapAPI(SubAPI):
         """ Removes all peers in the bootstrap list """
         return await self.fetch_json(self.url('bootstrap/rm/all'))
 
+
 class ConfigAPI(SubAPI):
     """ Configuration management API """
 
@@ -417,7 +431,8 @@ class ConfigAPI(SubAPI):
                 mpwriter.append_payload(cpay)
 
                 return await self.post(self.url('config/replace'),
-                    data=mpwriter, outformat='text')
+                                       data=mpwriter, outformat='text')
+
 
 class DagAPI(SubAPI):
     async def put(self, filename, format='cbor', input_enc='json', pin=False):
@@ -434,20 +449,20 @@ class DagAPI(SubAPI):
             raise Exception('dag put: {} file does not exist'.format(filename))
 
         params = {
-                'format': format,
-                'input-enc': input_enc,
-                'pin': boolarg(pin)
+            'format': format,
+            'input-enc': input_enc,
+            'pin': boolarg(pin)
         }
 
         basename = os.path.basename(filename)
         with multi.FormDataWriter() as mpwriter:
             dag_payload = payload.BytesIOPayload(open(filename, 'rb'))
             dag_payload.set_content_disposition('form-data',
-                    filename=basename)
+                                                filename=basename)
             mpwriter.append_payload(dag_payload)
 
             return await self.post(self.url('dag/put'), mpwriter,
-                    params=params, outformat='json')
+                                   params=params, outformat='json')
 
     async def get(self, objpath):
         """
@@ -457,7 +472,7 @@ class DagAPI(SubAPI):
         """
 
         return await self.fetch_text(self.url('dag/get'),
-                params={ARG_PARAM: objpath})
+                                     params={ARG_PARAM: objpath})
 
     async def resolve(self, path):
         """
@@ -467,12 +482,15 @@ class DagAPI(SubAPI):
         """
 
         return await self.fetch_json(self.url('dag/resolve'),
-                params={ARG_PARAM: path})
+                                     params={ARG_PARAM: path})
+
 
 class DhtAPI(SubAPI):
     async def findpeer(self, peerid, verbose=False):
-        return await self.fetch_json(self.url('dht/findpeer'),
-                params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)})
+        return await self.fetch_json(
+            self.url('dht/findpeer'),
+            params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
+        )
 
     @async_generator
     async def findprovs(self, key, verbose=False, numproviders=20):
@@ -483,32 +501,38 @@ class DhtAPI(SubAPI):
         }
 
         async for value in self.mjson_decode(self.url('dht/findprovs'),
-                params=params):
+                                             params=params):
             await yield_(value)
 
     async def get(self, peerid, verbose=False):
-        return await self.fetch_json(self.url('dht/get'),
-                params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)})
+        return await self.fetch_json(
+            self.url('dht/get'),
+            params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
+        )
 
     async def put(self, key, value):
         return await self.fetch_json(self.url('dht/put'),
-                params=quote_args(key, value))
+                                     params=quote_args(key, value))
 
     async def provide(self, multihash, verbose=False, recursive=False):
         params = {
-            ARG_PARAM: peerid,
+            ARG_PARAM: multihash,
             'verbose': boolarg(verbose),
             'recursive': boolarg(recursive)
         }
 
-        return await self.fetch_json(self.url('dht/provide'),
-                params={ARG_PARAM: multihash, 'verbose': boolarg(verbose)})
+        return await self.fetch_json(
+            self.url('dht/provide'),
+            params=params
+        )
 
     @async_generator
     async def query(self, peerid, verbose=False):
-        async for value in self.mjson_decode(self.url('dht/query'),
+        async for value in self.mjson_decode(
+                self.url('dht/query'),
                 params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}):
             await yield_(value)
+
 
 class DiagAPI(SubAPI):
     async def sys(self):
@@ -517,11 +541,12 @@ class DiagAPI(SubAPI):
     async def cmds_clear(self):
         return await self.fetch_text(self.url('diag/cmds/clear'))
 
+
 class FilesAPI(SubAPI):
     async def cp(self, source, dest):
         params = quote_args(source, dest)
         return await self.fetch_text(self.url('files/cp'),
-                params=params)
+                                     params=params)
 
     async def chcid(self, path, cidversion):
         params = {ARG_PARAM: path, 'cid-version': str(cidversion)}
@@ -530,7 +555,7 @@ class FilesAPI(SubAPI):
     async def flush(self, path):
         params = {ARG_PARAM: path}
         return await self.fetch_text(self.url('files/flush'),
-                params=params)
+                                     params=params)
 
     async def mkdir(self, path, parents=False, cid_version=None):
         params = {ARG_PARAM: path, 'parents': boolarg(parents)}
@@ -539,17 +564,17 @@ class FilesAPI(SubAPI):
             params['cid-version'] = str(cid_version)
 
         return await self.fetch_text(self.url('files/mkdir'),
-                params=params)
+                                     params=params)
 
     async def mv(self, src, dst):
         params = quote_args(src, dst)
         return await self.fetch_text(self.url('files/mv'),
-                params=params)
+                                     params=params)
 
     async def ls(self, path, long=False):
         params = {ARG_PARAM: path, 'l': boolarg(long)}
         return await self.fetch_json(self.url('files/ls'),
-                params=params)
+                                     params=params)
 
     async def read(self, path, offset=None, count=None):
         params = {ARG_PARAM: path}
@@ -560,12 +585,12 @@ class FilesAPI(SubAPI):
             params['count'] = count
 
         return await self.fetch_raw(self.url('files/read'),
-                params=params)
+                                    params=params)
 
     async def rm(self, path, recursive=False):
         params = {ARG_PARAM: path, 'recursive': boolarg(recursive)}
         return await self.fetch_json(self.url('files/rm'),
-                params=params)
+                                     params=params)
 
     async def stat(self, path, hash=False, size=False):
         params = {
@@ -574,10 +599,10 @@ class FilesAPI(SubAPI):
             'size': boolarg(size)
         }
         return await self.fetch_json(self.url('files/stat'),
-                params=params)
+                                     params=params)
 
     async def write(self, mfspath, data, create=False,
-            truncate=False, offset=-1, count=-1):
+                    truncate=False, offset=-1, count=-1):
         """
         Write to a mutable file in a given filesystem.
 
@@ -603,7 +628,7 @@ class FilesAPI(SubAPI):
         if isinstance(data, bytes):
             file_payload = payload.BytesPayload(data)
             file_payload.set_content_disposition('form-data', name='data',
-                    filename='data')
+                                                 filename='data')
         elif isinstance(data, str):
             # Filepath
             file_payload = multi.bytes_payload_from_file(data)
@@ -614,7 +639,8 @@ class FilesAPI(SubAPI):
             mpwriter.append_payload(file_payload)
 
             return await self.post(self.url('files/write'),
-                    mpwriter, params=params, outformat='text')
+                                   mpwriter, params=params, outformat='text')
+
 
 class FilestoreAPI(SubAPI):
     async def dups(self):
@@ -627,23 +653,28 @@ class FilestoreAPI(SubAPI):
         }
 
     async def ls(self, cid, fileorder=False):
-       return await self.fetch_json(self.url('filestore/ls'),
-                params=self.__lsverifyparams(cid, fileorder))
+        return await self.fetch_json(
+            self.url('filestore/ls'),
+            params=self.__lsverifyparams(cid, fileorder)
+        )
 
     async def verify(self, cid, fileorder=False):
-       return await self.fetch_json(self.url('filestore/verify'),
-                params=self.__lsverifyparams(cid, fileorder))
+        return await self.fetch_json(
+            self.url('filestore/verify'),
+            params=self.__lsverifyparams(cid, fileorder)
+        )
+
 
 class KeyAPI(SubAPI):
     async def list(self, long=False):
         params = {'l': boolarg(long)}
         return await self.fetch_json(self.url('key/list'),
-                params=params)
+                                     params=params)
 
     async def gen(self, name, type='rsa', size=2048):
         params = {ARG_PARAM: name, 'type': type, 'size': str(size)}
         return await self.fetch_json(self.url('key/gen'),
-                params=params)
+                                     params=params)
 
     async def rm(self, name):
         params = {ARG_PARAM: name}
@@ -652,6 +683,7 @@ class KeyAPI(SubAPI):
     async def rename(self, src, dst):
         params = quote_args(src, dst)
         return await self.fetch_json(self.url('key/rename'), params=params)
+
 
 class LogAPI(SubAPI):
     @async_generator
@@ -682,18 +714,20 @@ class LogAPI(SubAPI):
         """
 
         return await self.fetch_json(self.url('log/level'),
-            params=quote_args(subsystem, level))
+                                     params=quote_args(subsystem, level))
+
 
 class NamePubsubAPI(SubAPI):
     async def cancel(self, name):
         return await self.fetch_json(self.url('name/pubsub/cancel'),
-            params={ARG_PARAM: name})
+                                     params={ARG_PARAM: name})
 
     async def state(self):
         return await self.fetch_json(self.url('name/pubsub/state'))
 
     async def subs(self):
         return await self.fetch_json(self.url('name/pubsub/subs'))
+
 
 class NameAPI(SubAPI):
     def __init__(self, driver):
@@ -702,7 +736,7 @@ class NameAPI(SubAPI):
         self.pubsub = NamePubsubAPI(driver)
 
     async def publish(self, path, resolve=True, lifetime='24h',
-            key='self', ttl=None):
+                      key='self', ttl=None):
         params = {
             ARG_PARAM: path,
             'resolve': boolarg(resolve),
@@ -714,7 +748,7 @@ class NameAPI(SubAPI):
         return await self.fetch_json(self.url('name/publish'), params=params)
 
     async def resolve(self, name=None, recursive=False, nocache=False,
-            dht_record_count=None, dht_timeout=None):
+                      dht_record_count=None, dht_timeout=None):
         params = {
             'recursive': boolarg(recursive),
             'nocache': boolarg(nocache)
@@ -729,7 +763,8 @@ class NameAPI(SubAPI):
             params[ARG_PARAM] = name
 
         return await self.fetch_json(self.url('name/resolve'),
-                params=params)
+                                     params=params)
+
 
 class ObjectPatchAPI(SubAPI):
     async def add_link(self, cid, name, obj, create=False):
@@ -745,14 +780,14 @@ class ObjectPatchAPI(SubAPI):
             params['create'] = boolarg(create)
 
         return await self.fetch_json(self.url('object/patch/add-link'),
-                params=quote_dict(params))
+                                     params=quote_dict(params))
 
     async def rm_link(self, cid, name):
         """
         Remove a link from an object.
         """
         return await self.fetch_json(self.url('object/patch/rm-link'),
-                params=quote_args(cid, name))
+                                     params=quote_args(cid, name))
 
     async def append_data(self, cid, filepath):
         """
@@ -765,13 +800,14 @@ class ObjectPatchAPI(SubAPI):
         }
 
         if not os.path.isfile(filepath):
-            raise Exception('object append: {} file does not exist'.format(filepath))
+            raise Exception(
+                'object append: {} file does not exist'.format(filepath))
 
         with multi.FormDataWriter() as mpwriter:
             mpwriter.append_payload(multi.bytes_payload_from_file(filepath))
 
             return await self.post(self.url('object/patch/append-data'),
-                    mpwriter, params=params, outformat='json')
+                                   mpwriter, params=params, outformat='json')
 
     async def set_data(self, cid, filepath):
         """
@@ -784,13 +820,15 @@ class ObjectPatchAPI(SubAPI):
         }
 
         if not os.path.isfile(filepath):
-            raise Exception('object set_data: {} file does not exist'.format(filepath))
+            raise Exception(
+                'object set_data: {} file does not exist'.format(filepath))
 
         with multi.FormDataWriter() as mpwriter:
             mpwriter.append_payload(multi.bytes_payload_from_file(filepath))
 
             return await self.post(self.url('object/patch/set-data'),
-                    mpwriter, params=params, outformat='json')
+                                   mpwriter, params=params, outformat='json')
+
 
 class ObjectAPI(SubAPI):
     def __init__(self, driver):
@@ -821,22 +859,24 @@ class ObjectAPI(SubAPI):
         return await self.fetch_raw(self.url('object/data'), params=params)
 
     async def put(self, filepath, input_enc='json', datafield_enc='text',
-            pin=None, quiet=True):
+                  pin=None, quiet=True):
         if not os.path.isfile(filepath):
-            raise Exception('object put: {} file does not exist'.format(filepath))
+            raise Exception(
+                'object put: {} file does not exist'.format(filepath))
 
         params = {
-                'inputenc': input_enc,
-                'datafieldenc': datafield_enc,
-                'pin': boolarg(pin),
-                'quiet': boolarg(quiet)
+            'inputenc': input_enc,
+            'datafieldenc': datafield_enc,
+            'pin': boolarg(pin),
+            'quiet': boolarg(quiet)
         }
 
         with multi.FormDataWriter() as mpwriter:
             mpwriter.append_payload(multi.bytes_payload_from_file(filepath))
 
             return await self.post(self.url('object/put'), mpwriter,
-                    params=params, outformat='json')
+                                   params=params, outformat='json')
+
 
 class PinAPI(SubAPI):
     @async_generator
@@ -869,7 +909,7 @@ class PinAPI(SubAPI):
             params[ARG_PARAM] = multihash
 
         return await self.fetch_json(self.url('pin/ls'),
-            params=params)
+                                     params=params)
 
     async def rm(self, multihash, recursive=True):
         """
@@ -881,7 +921,7 @@ class PinAPI(SubAPI):
             'recursive': boolarg(recursive)
         }
         return await self.fetch_json(self.url('pin/rm'),
-            params=params)
+                                     params=params)
 
     async def verify(self, verbose=False, quiet=True):
         """
@@ -893,7 +933,7 @@ class PinAPI(SubAPI):
             'quiet': boolarg(quiet)
         }
         return await self.fetch_json(self.url('pin/verify'),
-            params=params)
+                                     params=params)
 
     async def update(self, old, new, unpin=True):
         """
@@ -909,6 +949,7 @@ class PinAPI(SubAPI):
             'unpin': boolarg(unpin)
         })
         return await self.fetch_json(self.url('pin/update'), params=params)
+
 
 class PubSubAPI(SubAPI):
     async def ls(self):
@@ -932,7 +973,7 @@ class PubSubAPI(SubAPI):
         """
 
         return await self.fetch_text(self.url('pubsub/pub'),
-            params=quote_args(topic, data))
+                                     params=quote_args(topic, data))
 
     @async_generator
     async def sub(self, topic, discover=True):
@@ -950,12 +991,12 @@ class PubSubAPI(SubAPI):
         params = {ARG_PARAM: topic, 'discover': boolarg(discover)}
 
         async for message in self.mjson_decode(self.url('pubsub/sub'),
-                params=params):
+                                               params=params):
             try:
                 converted = self.decode_message(message)
-            except Exception as exc:
+            except Exception:
                 print('Could not decode pubsub message ({0})'.format(topic),
-                    file=sys.stderr)
+                      file=sys.stderr)
             else:
                 await yield_(converted)
 
@@ -975,11 +1016,13 @@ class PubSubAPI(SubAPI):
         conv_msg['topicIDs'] = psmsg['topicIDs']
         return conv_msg
 
+
 class RefsAPI(SubAPI):
     @async_generator
     async def local(self):
         async for ref in self.mjson_decode(self.url('refs/local')):
             await yield_(ref)
+
 
 class RepoAPI(SubAPI):
     async def gc(self, quiet=False, streamerrors=False):
@@ -988,7 +1031,7 @@ class RepoAPI(SubAPI):
             'stream-errors': boolarg(streamerrors)
         }
         return await self.fetch_text(self.url('repo/gc'),
-            params=params)
+                                     params=params)
 
     async def verify(self):
         return await self.fetch_json(self.url('repo/verify'))
@@ -998,7 +1041,8 @@ class RepoAPI(SubAPI):
 
     async def stat(self, human=False):
         return await self.fetch_json(self.url('repo/stat'),
-                params={'human': boolarg(human)})
+                                     params={'human': boolarg(human)})
+
 
 class SwarmAPI(SubAPI):
     async def peers(self):
@@ -1010,7 +1054,7 @@ class SwarmAPI(SubAPI):
     async def addrs_local(self, id=False):
         params = {'id': boolarg(id)}
         return await self.fetch_json(self.url('swarm/addrs/local'),
-                params=params)
+                                     params=params)
 
     async def addrs_listen(self):
         return await self.fetch_json(self.url('swarm/addrs/listen'))
@@ -1018,28 +1062,29 @@ class SwarmAPI(SubAPI):
     async def connect(self, peer):
         params = {ARG_PARAM: peer}
         return await self.fetch_json(self.url('swarm/connect'),
-                params=params)
+                                     params=params)
 
     async def disconnect(self, peer):
         params = {ARG_PARAM: peer}
         return await self.fetch_json(self.url('swarm/disconnect'),
-                params=params)
+                                     params=params)
 
     async def filters_add(self, filter):
         params = {ARG_PARAM: filter}
         return await self.fetch_json(self.url('swarm/filters/add'),
-                params=params)
+                                     params=params)
 
     async def filters_rm(self, filter):
         params = {ARG_PARAM: filter}
         return await self.fetch_json(self.url('swarm/filters/rm'),
-                params=params)
+                                     params=params)
+
 
 class TarAPI(SubAPI):
     async def cat(self, multihash):
-        params = { ARG_PARAM: multihash }
+        params = {ARG_PARAM: multihash}
         return await self.fetch_raw(self.url('tar/cat'),
-                params=params)
+                                    params=params)
 
     async def add(self, tar):
         if not os.path.exists(tar):
@@ -1049,8 +1094,9 @@ class TarAPI(SubAPI):
             mpwriter.append_payload(multi.bytes_payload_from_file(tar))
 
             async with self.driver.session.post(self.url('tar/add'),
-                    data=mpwriter) as response:
+                                                data=mpwriter) as response:
                 return await response.json()
+
 
 class StatsAPI(SubAPI):
     async def bw(self):
@@ -1062,10 +1108,11 @@ class StatsAPI(SubAPI):
     async def repo(self):
         return await self.fetch_json(self.url('stats/repo'))
 
+
 class CoreAPI(SubAPI):
     def _add_post(self, data, params={}):
         return self.driver.session.post(self.url('add'), data=data,
-            params=params)
+                                        params=params)
 
     async def add_single(self, mpart, params={}):
         """
@@ -1082,8 +1129,11 @@ class CoreAPI(SubAPI):
         entry added. We use mjson_decode with the post method.
         """
 
-        async for added in self.mjson_decode(self.url('add'),
-                method='post', data=mpart, params=params):
+        async for added in self.mjson_decode(
+                self.url('add'),
+                method='post',
+                data=mpart,
+                params=params):
             await yield_(added)
 
     async def add_bytes(self, data):
@@ -1113,9 +1163,10 @@ class CoreAPI(SubAPI):
 
     @async_generator
     async def add(self, *files, recursive=False, quiet=False, quieter=False,
-            silent=False, progress=False, trickle=False, fscache=False,
-            only_hash=False, wrap_with_directory=False, pin=True,
-            raw_leaves=False, nocopy=False, hidden=False, cid_version=None):
+                  silent=False, progress=False, trickle=False, fscache=False,
+                  only_hash=False, wrap_with_directory=False, pin=True,
+                  raw_leaves=False, nocopy=False, hidden=False,
+                  cid_version=None):
         """
         Add a file or directory to ipfs.
 
@@ -1183,23 +1234,27 @@ class CoreAPI(SubAPI):
                         await asyncio.sleep(0)
                         _name, _fd, _ctype = entry[1]
                         if _ctype == 'application/x-directory':
-                            pay = payload.StringIOPayload(_fd,
-                                    content_type=_ctype, filename=_name)
+                            pay = payload.StringIOPayload(
+                                _fd, content_type=_ctype, filename=_name)
                             pay.set_content_disposition('file', name=_name,
-                                    filename=_name)
+                                                        filename=_name)
                             mpwriter.append_payload(pay)
                         else:
-                            pay = payload.BufferedReaderPayload(_fd, filename=_name)
-                            pay.set_content_disposition('file',
-                                    filename=_name, name=_name)
+                            pay = payload.BufferedReaderPayload(
+                                _fd, filename=_name)
+                            pay.set_content_disposition(
+                                'file', filename=_name, name=_name)
                             mpwriter.append_payload(pay)
                 else:
                     basename = os.path.basename(filepath)
 
                     file_payload = payload.BytesIOPayload(open(filepath, 'rb'))
                     file_payload.set_content_disposition('file', name=basename,
-                            filename=basename)
+                                                         filename=basename)
                     mpwriter.append_payload(file_payload)
+
+            if mpwriter.size == 0:
+                raise aioipfs.UnknownAPIError('Multipart is empty')
 
             async for value in self.add_generic(mpwriter, params=params):
                 await yield_(value)
@@ -1237,9 +1292,9 @@ class CoreAPI(SubAPI):
         return await self.fetch_raw(self.url('cat'), params=params)
 
     async def get(self, multihash, dstdir='.', compress=False,
-            compression_level=-1, archive=True,
-            progress_callback=None, progress_callback_arg=None,
-            chunk_size=16384):
+                  compression_level=-1, archive=True,
+                  progress_callback=None, progress_callback_arg=None,
+                  chunk_size=16384):
         """
         Download IPFS objects.
 
@@ -1268,9 +1323,7 @@ class CoreAPI(SubAPI):
         read_so_far = 0
         async with aiofiles.open(archive_path, 'wb') as fd:
             async with self.driver.session.get(self.url('get'),
-                    params=opts) as response:
-                content_length = response.headers.get("X-Content-Length", 0)
-
+                                               params=opts) as response:
                 if response.status != 200:
                     return False
 
@@ -1283,7 +1336,7 @@ class CoreAPI(SubAPI):
 
                     if callable(progress_callback):
                         await progress_callback(multihash, read_so_far,
-                                progress_callback_arg)
+                                                progress_callback_arg)
 
                     await fd.write(chunk)
                     await asyncio.sleep(0)
@@ -1315,7 +1368,7 @@ class CoreAPI(SubAPI):
 
         :param str path: The path to the IPFS object(s) to list links from
         :param bool headers: Print table headers (Hash, Size, Name)
-        :param bool resolve_type: Resolve linked objects to find out their types
+        :param bool resolve_type: Resolve linked objects to get their types
         """
 
         params = {
@@ -1341,7 +1394,8 @@ class CoreAPI(SubAPI):
         :param int count: Number of ping messages to send
         """
 
-        async for value in self.mjson_decode(self.url('ping'),
+        async for value in self.mjson_decode(
+                self.url('ping'),
                 params={ARG_PARAM: peerid, 'count': str(count)}):
             await yield_(value)
 

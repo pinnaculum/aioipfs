@@ -1,22 +1,24 @@
-
 import pytest
 
 import tempfile
 import random
 import time
 import subprocess
-import os, os.path
+import os
+import os.path
 import json
-import shutil
 
-import asyncio, json
+import asyncio
+import json
 import aioipfs
+
 
 def ipfs_getconfig_var(var):
     sp_getconfig = subprocess.Popen(['ipfs', 'config',
-        var], stdout = subprocess.PIPE)
+                                     var], stdout=subprocess.PIPE)
     stdout, stderr = sp_getconfig.communicate()
     return stdout.decode()
+
 
 @pytest.fixture
 def smalltar():
@@ -28,30 +30,36 @@ def smalltar():
     yield tar, tpath
     os.unlink(tpath)
 
+
 @pytest.fixture
 def testfile1(tmpdir):
     filep = tmpdir.join('testfile1.txt')
     filep.write('POIEKJDOOOPIDMWOPIMPOWE()=ds129084bjcy')
     return filep
 
+
 @pytest.fixture
 def testfile2(tmpdir):
     r = random.Random()
     filep = tmpdir.join('testfile2.txt')
     for i in range(0, 128):
-        filep.write(str(r.randint(i, i*2)))
+        filep.write(str(r.randint(i, i * 2)))
     return filep
+
 
 def ipfs_config(param, value):
     os.system('ipfs config {0} "{1}"'.format(param, value))
+
 
 def ipfs_config_json(param, value):
     os.system('ipfs config --json {0} "{1}"'.format(
         param, json.dumps(value)))
 
+
 apiport = 9001
 gwport = 9080
 swarmport = 9002
+
 
 @pytest.fixture(scope='module')
 def ipfsdaemon():
@@ -64,11 +72,11 @@ def ipfsdaemon():
     os.putenv('IPFS_PATH', tmpdir)
     os.system('ipfs init -e')
     ipfs_config('Addresses.API',
-            '/ip4/127.0.0.1/tcp/{0}'.format(apiport))
+                '/ip4/127.0.0.1/tcp/{0}'.format(apiport))
     ipfs_config('Addresses.Gateway',
-            '/ip4/127.0.0.1/tcp/{0}'.format(gwport))
+                '/ip4/127.0.0.1/tcp/{0}'.format(gwport))
     ipfs_config_json('Addresses.Swarm',
-            '["/ip4/127.0.0.1/tcp/{0}"]'.format(swarmport))
+                     '["/ip4/127.0.0.1/tcp/{0}"]'.format(swarmport))
 
     # Empty bootstrap so we're not bothered
     ipfs_config_json('Bootstrap', '[]')
@@ -77,7 +85,7 @@ def ipfsdaemon():
 
     # Run the daemon and wait a bit
     sp = subprocess.Popen(['ipfs', 'daemon'],
-            stdout = subprocess.PIPE)
+                          stdout=subprocess.PIPE)
     time.sleep(1)
 
     yield tmpdir, sp
@@ -86,13 +94,16 @@ def ipfsdaemon():
     # Cleanup
     sp.terminate()
 
+
 @pytest.fixture
 def ipfs_peerid(ipfsdaemon):
     return ipfs_getconfig_var('Identity.PeerID').strip()
 
+
 @pytest.fixture()
 def iclient(event_loop):
     return aioipfs.AsyncIPFS(port=apiport, loop=event_loop)
+
 
 class TestAsyncIPFS:
     @pytest.mark.asyncio
@@ -132,13 +143,13 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_add(self, event_loop, ipfsdaemon, iclient, testfile1,
-            testfile2):
+                       testfile2):
         count = 0
         async for added in iclient.add(str(testfile1)):
             count += 1
         assert count == 1
         count = 0
-        all = [[ str(testfile1), str(testfile2)]]
+        all = [[str(testfile1), str(testfile2)]]
         async for added in iclient.add(*all):
             count += 1
         assert count == 2
@@ -159,10 +170,10 @@ class TestAsyncIPFS:
     @pytest.mark.parametrize('second', ['beer', 'wine'])
     async def test_addjson(self, event_loop, ipfsdaemon, iclient, order, second):
         json1 = {
-                'random': 'stuff',
-                'order': order,
-                'second': second
-                }
+            'random': 'stuff',
+            'order': order,
+            'second': second
+        }
 
         reply = await iclient.add_json(json1)
         h = reply['Hash']
@@ -213,7 +224,7 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_multiget(self, event_loop, ipfsdaemon,
-            iclient, testfile2, tmpdir):
+                            iclient, testfile2, tmpdir):
         hashes = []
 
         # Create 16 variations of testfile2 and add them to the node
@@ -223,7 +234,7 @@ class TestAsyncIPFS:
                 hashes.append(reply['Hash'])
 
         # Get them all back concurrently
-        tasks = [ iclient.get(hash, dstdir=tmpdir) for hash in hashes ]
+        tasks = [iclient.get(hash, dstdir=tmpdir) for hash in hashes]
         await asyncio.gather(*tasks)
         await iclient.close()
 
@@ -233,7 +244,7 @@ class TestAsyncIPFS:
         # --enable-pubsub-experiment this should raise an exception
         with pytest.raises(aioipfs.APIError) as exc:
             topics = await iclient.pubsub.ls()
-            peers  = await iclient.pubsub.peers()
+            peers = await iclient.pubsub.peers()
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -247,12 +258,12 @@ class TestAsyncIPFS:
     @pytest.mark.parametrize('protocol', ['test'])
     @pytest.mark.parametrize('address', ['/ip4/127.0.0.1/tcp/10000'])
     async def test_p2p(self, event_loop, ipfsdaemon, iclient, protocol,
-            address):
+                       address):
         ret = await iclient.p2p.listener_open(protocol, address)
         listeners = await iclient.p2p.listener_ls(headers=True)
         assert len(listeners['Listeners']) > 0
         assert listeners['Listeners'][0]['Protocol'] == '/p2p/{}'.format(
-                protocol)
+            protocol)
         assert listeners['Listeners'][0]['Address'] == address
         await iclient.p2p.listener_close(protocol)
         listeners = await iclient.p2p.listener_ls()
@@ -267,7 +278,8 @@ class TestAsyncIPFS:
         key_hash = reply['Id']
 
         reply = await iclient.key.list()
-        assert len(reply['Keys']) == 2 # initial peer key + the one we just made
+        # initial peer key + the one we just made
+        assert len(reply['Keys']) == 2
 
         removed = await iclient.key.rm(keyname)
         assert removed['Keys'].pop()['Id'] == key_hash
@@ -289,7 +301,7 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('obj', [b'0123456789'])
     async def test_files_rw(self, event_loop, ipfsdaemon, iclient, obj,
-            testfile1, testfile2):
+                            testfile1, testfile2):
         # Write obj (bytes) to /test1
         ret = await iclient.files.write('/test1', obj, create=True)
         data = await iclient.files.read('/test1')
@@ -306,7 +318,7 @@ class TestAsyncIPFS:
         resp = await iclient.files.write('/test3', str(testfile2), create=True)
         otro = b'123'
         resp = await iclient.files.write('/test3', otro, create=True,
-                offset=5)
+                                         offset=5)
         data = await iclient.files.read('/test3', offset=5, count=3)
         assert data == otro
         await iclient.close()
@@ -315,15 +327,15 @@ class TestAsyncIPFS:
     @pytest.mark.parametrize('obj1', [b'0123456789'])
     @pytest.mark.parametrize('obj2', [b'0a1b2c3d4e5'])
     async def test_object(self, event_loop, ipfsdaemon, iclient, obj1, obj2,
-            testfile2):
+                          testfile2):
         """ Unsure if this is correct """
         obj1Ent = await iclient.add_bytes(obj1)
         obj2Ent = await iclient.add_bytes(obj2)
         obj = await iclient.object.new()
         r1 = await iclient.object.patch.add_link(obj['Hash'], 'obj1',
-                obj1Ent['Hash'])
+                                                 obj1Ent['Hash'])
         r2 = await iclient.object.patch.add_link(r1['Hash'], 'obj2',
-                obj2Ent['Hash'])
+                                                 obj2Ent['Hash'])
 
         dag = await iclient.object.get(r2['Hash'])
         assert len(dag['Links']) == 2

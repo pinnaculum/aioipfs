@@ -1,15 +1,16 @@
-
-import os, os.path
+import os
+import os.path
 import io
 import re
 
-import asyncio
 import aiohttp
 from aiohttp import payload
+
 
 class FormDataWriter(aiohttp.MultipartWriter):
     def __init__(self):
         super().__init__(subtype="form-data")
+
 
 def multiform_bytes(bytes):
     with FormDataWriter() as mpwriter:
@@ -18,20 +19,23 @@ def multiform_bytes(bytes):
         mpwriter.append_payload(part)
         return mpwriter
 
+
 def multiform_json(json):
     with FormDataWriter() as mpwriter:
         part = payload.JsonPayload(json)
         part.set_content_disposition('form-data', name='',
-            filename='')
+                                     filename='')
         mpwriter.append_payload(part)
         return mpwriter
+
 
 def bytes_payload_from_file(filepath):
     basename = os.path.basename(filepath)
     file_payload = payload.BytesIOPayload(open(filepath, 'rb'))
     file_payload.set_content_disposition('form-data',
-            filename=basename)
+                                         filename=basename)
     return file_payload
+
 
 def glob_compile(pat):
     """ From ipfsapi.multipart
@@ -82,7 +86,8 @@ def glob_compile(pat):
                 res = '%s[%s]' % (res, stuff)
         else:
             res = res + re.escape(c)
-    return re.compile('^' + res + '\Z(?ms)' + '$')
+    return re.compile('^' + res + r'\Z(?ms)' + '$')
+
 
 class DirectoryListing:
     """ This class is from ipfsapi.multipart.DirectoryStream, reused it
@@ -118,7 +123,7 @@ class DirectoryListing:
                 return
 
             # Scan for first super-directory that has already been added
-            dir_base  = short_path
+            dir_base = short_path
             dir_parts = []
             while dir_base:
                 dir_base, dir_name = os.path.split(dir_base)
@@ -135,7 +140,9 @@ class DirectoryListing:
                 mock_file.write(u'')
                 # Add this directory to those that will be sent
                 names.append(('files',
-                             (dir_base, mock_file, 'application/x-directory')))
+                              (dir_base,
+                               mock_file,
+                               'application/x-directory')))
                 # Remember that this directory has already been sent
                 added_directories.add(dir_base)
 

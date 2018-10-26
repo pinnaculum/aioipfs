@@ -1,5 +1,4 @@
-
-__version__ = '0.3.5'
+__version__ = '0.3.6'
 
 from yarl import URL
 
@@ -8,8 +7,10 @@ import aiohttp
 
 from aioipfs import api
 
+
 class UnknownAPIError(Exception):
     pass
+
 
 class APIError(Exception):
     """
@@ -23,6 +24,7 @@ class APIError(Exception):
         self.code = code
         self.message = message
         self.http_status = http_status
+
 
 class AsyncIPFS(object):
     """
@@ -38,7 +40,7 @@ class AsyncIPFS(object):
     """
 
     def __init__(self, host='localhost', port=5001, loop=None,
-            conns_max=0, conns_max_per_host=0, read_timeout=None):
+                 conns_max=0, conns_max_per_host=0, read_timeout=None):
 
         self._conns_max = conns_max
         self._conns_max_per_host = conns_max_per_host
@@ -49,14 +51,14 @@ class AsyncIPFS(object):
         self.loop = loop if loop else asyncio.get_event_loop()
 
         self.api_url = URL.build(host=host, port=port,
-                scheme='http', path='api/v0/')
+                                 scheme='http', path='api/v0/')
 
         self.session = aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(
-                    limit=self._conns_max,
-                    limit_per_host=self._conns_max_per_host,
-                    loop=self.loop
-                ), read_timeout=self._read_timeout)
+            connector=aiohttp.TCPConnector(
+                limit=self._conns_max,
+                limit_per_host=self._conns_max_per_host,
+                loop=self.loop
+            ), read_timeout=self._read_timeout)
 
         # Install the API handlers
         self.core = api.CoreAPI(self)
