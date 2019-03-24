@@ -1,8 +1,10 @@
-
-import os, os.path, re
+import os
+import os.path
+import re
 import sys
 import codecs
-from setuptools import setup, find_packages
+
+from setuptools import setup
 
 PY_VER = sys.version_info
 
@@ -28,7 +30,7 @@ with open('requirements.txt') as f:
 setup(
     name='aioipfs',
     version=version,
-    license='GPL3',
+    license='LGPLv3',
     author='David Ferlier',
     url='https://gitlab.com/cipres/aioipfs',
     description='Asynchronous IPFS client library',
@@ -40,12 +42,13 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Intended Audience :: Developers',
         'Development Status :: 4 - Beta',
         'Natural Language :: English',
         'Operating System :: OS Independent',
-        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
-        'Topic :: System :: Filesystems',
+        'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
+        'Topic :: System :: Filesystems'
     ],
     keywords=[
         'asyncio',

@@ -1,15 +1,12 @@
-__version__ = '0.3.8'
+__version__ = '0.3.9'
 
 from yarl import URL
+from distutils.version import StrictVersion
 
 import asyncio
 import aiohttp
 
 from aioipfs import api
-
-
-class UnknownAPIError(Exception):
-    pass
 
 
 class APIError(Exception):
@@ -26,6 +23,10 @@ class APIError(Exception):
         self.http_status = http_status
 
 
+class UnknownAPIError(APIError):
+    pass
+
+
 class AsyncIPFS(object):
     """
     Asynchronous IPFS API client
@@ -40,7 +41,8 @@ class AsyncIPFS(object):
     """
 
     def __init__(self, host='localhost', port=5001, loop=None,
-                 conns_max=0, conns_max_per_host=0, read_timeout=None):
+                 conns_max=0, conns_max_per_host=0, read_timeout=None,
+                 api_version='v0'):
 
         self._conns_max = conns_max
         self._conns_max_per_host = conns_max_per_host
@@ -51,7 +53,8 @@ class AsyncIPFS(object):
         self.loop = loop if loop else asyncio.get_event_loop()
 
         self.api_url = URL.build(host=host, port=port,
-                                 scheme='http', path='/api/v0/')
+                                 scheme='http',
+                                 path='/api/{v}/'.format(v=api_version))
 
         self.session = aiohttp.ClientSession(
             connector=aiohttp.TCPConnector(
@@ -67,6 +70,7 @@ class AsyncIPFS(object):
         self.pubsub = api.PubSubAPI(self)
         self.bitswap = api.BitswapAPI(self)
         self.bootstrap = api.BootstrapAPI(self)
+        self.cid = api.CidAPI(self)
         self.config = api.ConfigAPI(self)
         self.dag = api.DagAPI(self)
         self.dht = api.DhtAPI(self)
@@ -83,6 +87,13 @@ class AsyncIPFS(object):
         self.swarm = api.SwarmAPI(self)
         self.tar = api.TarAPI(self)
         self.stats = api.StatsAPI(self)
+        self.urlstore = api.UrlStoreAPI(self)
+
+        self._agent_version = None
+
+    @property
+    def agent_version(self):
+        return self._agent_version
 
     @property
     def host(self):
@@ -150,6 +161,40 @@ class AsyncIPFS(object):
 
     async def close(self):
         await self.session.close()
+
+    async def agent_version_get(self):
+        if self.agent_version is None:
+            node_idinfo = await self.core.id()
+
+            if node_idinfo:
+                agent_version = node_idinfo.get('AgentVersion')
+                if not isinstance(agent_version, str):
+                    raise ValueError('Invalid agent version')
+
+                comps = agent_version.rstrip('/').split('/')
+
+                if len(comps) == 2:
+                    self._agent_version = comps[1]
+
+        return self.agent_version
+
+    async def agent_version_superioreq(self, version):
+        """
+        Returns True if the node's agent version is superior or equal to
+        version
+
+        :param str version: a go-ipfs version number e.g 0.4.10
+        """
+        try:
+            node_vs = await self.agent_version_get()
+            version_node = StrictVersion(node_vs)
+            version_ref = StrictVersion(version)
+            return version_node >= version_ref
+        except BaseException:
+            return False
+
+    async def agent_version_post0418(self):
+        return await self.agent_version_superioreq('0.4.18')
 
     async def __aenter__(self):
         return self

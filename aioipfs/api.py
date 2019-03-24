@@ -20,8 +20,6 @@ from async_generator import async_generator, yield_
 
 from . import multi
 
-# Convenient functions
-
 ARG_PARAM = 'arg'
 
 
@@ -67,7 +65,7 @@ def decode_json(data):
     try:
         json_obj = json.loads(data.decode())
     except Exception as exc:
-        print(data)
+        print(data, file=sys.stderr)
         print('Could not read JSON object:', str(exc), file=sys.stderr)
         return None
 
@@ -193,17 +191,38 @@ class SubAPI(object):
 
 
 class P2PAPI(SubAPI):
-    async def listener_open(self, protocol, address):
+    """
+    P2P API.
+
+    Note: go-ipfs v0.4.18 introduced some changes in the P2P subsystem
+    and some endpoints were renamed. Agent version detection is done
+    in the affected API calls to maintain compatibility.
+    """
+    async def listener_open(self, protocol, address,
+                            allow_custom_protocol=False):
         """
         Open a P2P listener
 
         :param str protocol: protocol name associated with the listener
         :param str address: address for the listener, in multiaddr format
         """
-        return await self.fetch_json(self.url('p2p/listener/open'),
-                                     params=quote_args(protocol, address))
 
-    async def listener_close(self, protocol, all=False):
+        api_post0418 = await self.driver.agent_version_post0418()
+
+        if api_post0418 is True:
+            url = self.url('p2p/listen')
+            params = quote_dict({
+                ARG_PARAM: [protocol, address],
+                'allow-custom-protocol': boolarg(allow_custom_protocol)
+            })
+        else:
+            url = self.url('p2p/listener/open')
+            params = quote_args(protocol, address)
+
+        return await self.fetch_json(url, params=params)
+
+    async def listener_close(self, protocol, listen_address=None,
+                             target_address=None, all=False):
         """
         Close a previously opened P2P listener
 
@@ -211,12 +230,27 @@ class P2PAPI(SubAPI):
         :param bool all: if True, closes all listeners on the node
         """
 
-        params = {
-            ARG_PARAM: protocol,
-            'all': boolarg(all)
-        }
-        return await self.fetch_json(self.url('p2p/listener/close'),
-                                     params=params)
+        api_post0418 = await self.driver.agent_version_post0418()
+
+        if api_post0418 is True:
+            url = self.url('p2p/close')
+            params = {
+                'protocol': protocol,
+                'all': boolarg(all)
+            }
+
+            if listen_address:
+                params['listen-address'] = listen_address
+            if target_address:
+                params['target-address'] = target_address
+        else:
+            url = self.url('p2p/listener/close')
+            params = {
+                ARG_PARAM: protocol,
+                'all': boolarg(all)
+            }
+
+        return await self.fetch_json(url, params=params)
 
     async def listener_ls(self, headers=False):
         """
@@ -225,10 +259,18 @@ class P2PAPI(SubAPI):
         :param bool headers: print all headers (HandlerID, Protocol, ...)
         """
 
-        return await self.fetch_json(self.url('p2p/listener/ls'),
+        api_post0418 = await self.driver.agent_version_post0418()
+
+        if api_post0418 is True:
+            url = self.url('p2p/ls')
+        else:
+            url = self.url('p2p/listener/ls')
+
+        return await self.fetch_json(url,
                                      params={'headers': boolarg(headers)})
 
-    async def stream_dial(self, peer, protocol, address=None):
+    async def stream_dial(self, protocol, laddress, target,
+                          allow_custom_protocol=False):
         """
         Dial to a P2P listener.
 
@@ -238,18 +280,44 @@ class P2PAPI(SubAPI):
             (default: /ip4/127.0.0.1/tcp/0)
         """
 
-        args = [peer, protocol, address] if address else [peer, protocol]
-        params = quote_args(*args)
-        return await self.fetch_json(self.url('p2p/stream/dial'),
-                                     params=params)
+        api_post0418 = await self.driver.agent_version_post0418()
 
-    async def stream_close(self, streamid, all=False):
+        if api_post0418 is True:
+            url = self.url('p2p/forward')
+            params = quote_dict({
+                ARG_PARAM: [protocol, laddress, target],
+                'allow-custom-protocol': boolarg(allow_custom_protocol)
+            })
+        else:
+            url = self.url('p2p/stream/dial')
+            args = [
+                target,
+                protocol,
+                laddress] if laddress else [
+                target,
+                protocol]
+            params = quote_args(*args)
+
+        return await self.fetch_json(url, params=params)
+
+    async def stream_close(self, stream_id=None, all=False):
         """
         Close active P2P stream.
         """
 
+        if stream_id and all is False:
+            params = {
+                ARG_PARAM: stream_id,
+            }
+        elif all is True:
+            params = {
+                'all': boolarg(all)
+            }
+        else:
+            raise ValueError('Invalid stream parameters')
+
         return await self.fetch_text(self.url('p2p/stream/close'),
-                                     params={ARG_PARAM: streamid})
+                                     params=params)
 
     async def stream_ls(self, headers=False):
         """
@@ -257,6 +325,11 @@ class P2PAPI(SubAPI):
         """
         return await self.fetch_json(self.url('p2p/stream/ls'),
                                      params={'headers': boolarg(headers)})
+
+    listen = listener_open
+    dial = stream_dial
+    forward = stream_dial
+    ls = listener_ls
 
 
 class BitswapAPI(SubAPI):
@@ -408,6 +481,58 @@ class BootstrapAPI(SubAPI):
         return await self.fetch_json(self.url('bootstrap/rm/all'))
 
 
+class CidAPI(SubAPI):
+    """ CID API """
+
+    async def base32(self, cid):
+        return await self.fetch_json(self.url('cid/base32'),
+                                     params={ARG_PARAM: cid})
+
+    async def bases(self, prefix=False, numeric=False):
+        params = {
+            'prefix': boolarg(prefix),
+            'numeric': boolarg(numeric)
+        }
+        return await self.fetch_json(self.url('cid/bases'), params=params)
+
+    async def codecs(self, numeric=False):
+        params = {
+            'numeric': boolarg(numeric)
+        }
+        return await self.fetch_json(self.url('cid/codecs'), params=params)
+
+    async def format(self, cid, format=None, version=None, multibase=None):
+        """
+        Format and convert a CID in various useful ways.
+
+        :param str cid: CID to convert
+        :param str format: Printf style format string
+        :param int version: CID version to convert to
+        :param str multibase: Multibase to display CID in
+        """
+
+        params = {
+            ARG_PARAM: cid
+        }
+
+        if isinstance(version, int):
+            params['v'] = str(version)
+
+        if isinstance(format, str):
+            params['f'] = format
+
+        if isinstance(multibase, str):
+            params['b'] = multibase
+
+        return await self.fetch_json(self.url('cid/format'), params=params)
+
+    async def hashes(self, numeric=False):
+        params = {
+            'numeric': boolarg(numeric)
+        }
+        return await self.fetch_json(self.url('cid/hashes'), params=params)
+
+
 class ConfigAPI(SubAPI):
     """ Configuration management API """
 
@@ -432,6 +557,17 @@ class ConfigAPI(SubAPI):
 
                 return await self.post(self.url('config/replace'),
                                        data=mpwriter, outformat='text')
+
+    async def profile_apply(self, profile, dry_run=False):
+        """
+        Apply profile to config
+        """
+        params = {
+            ARG_PARAM: profile,
+            'dry-run': boolarg(dry_run)
+        }
+        return await self.fetch_json(self.url('config/profile/apply'),
+                                     params=params)
 
 
 class DagAPI(SubAPI):
@@ -571,8 +707,12 @@ class FilesAPI(SubAPI):
         return await self.fetch_text(self.url('files/mv'),
                                      params=params)
 
-    async def ls(self, path, long=False):
-        params = {ARG_PARAM: path, 'l': boolarg(long)}
+    async def ls(self, path, long=False, unsorted=False):
+        params = {
+            ARG_PARAM: path,
+            'l': boolarg(long),
+            'U': boolarg(unsorted)
+        }
         return await self.fetch_json(self.url('files/ls'),
                                      params=params)
 
@@ -587,21 +727,33 @@ class FilesAPI(SubAPI):
         return await self.fetch_raw(self.url('files/read'),
                                     params=params)
 
-    async def rm(self, path, recursive=False):
-        params = {ARG_PARAM: path, 'recursive': boolarg(recursive)}
+    async def rm(self, path, recursive=False, force=False):
+        params = {
+            ARG_PARAM: path,
+            'recursive': boolarg(recursive),
+            'force': boolarg(force)
+        }
         return await self.fetch_json(self.url('files/rm'),
                                      params=params)
 
-    async def stat(self, path, hash=False, size=False):
+    async def stat(self, path, hash=False, size=False,
+                   format=None, with_local=False):
         params = {
             ARG_PARAM: path,
             'hash': boolarg(hash),
-            'size': boolarg(size)
+            'size': boolarg(size),
+            'with-local': boolarg(with_local)
         }
+
+        if isinstance(format, str):
+            params['format'] = format
+
+
         return await self.fetch_json(self.url('files/stat'),
                                      params=params)
 
     async def write(self, mfspath, data, create=False,
+                    parents=False, cid_version=None,
                     truncate=False, offset=-1, count=-1):
         """
         Write to a mutable file in a given filesystem.
@@ -612,11 +764,13 @@ class FilesAPI(SubAPI):
         :param bool create: Create the file if it does not exist
         :param bol truncate: Truncate the file to size zero before writing
         :param int count: Maximum number of bytes to read
+        :param int cid_version: CID version to use
         """
 
         params = {
             ARG_PARAM: mfspath,
             'create': boolarg(create),
+            'parents': boolarg(parents),
             'truncate': boolarg(truncate)
         }
 
@@ -624,6 +778,9 @@ class FilesAPI(SubAPI):
             params['offset'] = offset
         if isinstance(count, int) and count > 0:
             params['count'] = count
+
+        if isinstance(cid_version, int):
+            params['cid-version'] = str(cid_version)
 
         if isinstance(data, bytes):
             file_payload = payload.BytesPayload(data)
@@ -736,22 +893,27 @@ class NameAPI(SubAPI):
         self.pubsub = NamePubsubAPI(driver)
 
     async def publish(self, path, resolve=True, lifetime='24h',
-                      key='self', ttl=None):
+                      key='self', ttl=None,
+                      quieter=False, allow_offline=False):
         params = {
             ARG_PARAM: path,
             'resolve': boolarg(resolve),
             'lifetime': lifetime,
-            'key': key
+            'key': key,
+            'quieter': boolarg(quieter),
+            'allow-offline': boolarg(allow_offline)
         }
         if isinstance(ttl, int):
             params['ttl'] = ttl
+
         return await self.fetch_json(self.url('name/publish'), params=params)
 
     async def resolve(self, name=None, recursive=False, nocache=False,
-                      dht_record_count=None, dht_timeout=None):
+                      dht_record_count=None, dht_timeout=None, stream=False):
         params = {
             'recursive': boolarg(recursive),
-            'nocache': boolarg(nocache)
+            'nocache': boolarg(nocache),
+            'stream': boolarg(stream)
         }
 
         if isinstance(dht_record_count, int):
@@ -1044,9 +1206,42 @@ class RepoAPI(SubAPI):
                                      params={'human': boolarg(human)})
 
 
+class StatsAPI(SubAPI):
+    async def bw(self, peer=None, proto=None, poll=False, interval=None):
+        """
+        Print ipfs bandwidth information
+        """
+        params = {
+            'poll': boolarg(poll)
+        }
+
+        if isinstance(peer, str):
+            params['peer'] = peer
+        if isinstance(proto, str):
+            params['proto'] = proto
+        if isinstance(interval, str):
+            params['interval'] = interval
+
+        return await self.fetch_json(self.url('stats/bw'), params=params)
+
+    async def bitswap(self):
+        return await self.fetch_json(self.url('stats/bitswap'))
+
+    async def repo(self):
+        return await self.fetch_json(self.url('stats/repo'))
+
+
 class SwarmAPI(SubAPI):
-    async def peers(self):
-        return await self.fetch_json(self.url('swarm/peers'))
+    async def peers(self, verbose=True, streams=False, latency=False,
+                    direction=False):
+        params = {
+            'verbose': boolarg(verbose),
+            'streams': boolarg(streams),
+            'latency': boolarg(latency),
+            'direction': boolarg(direction)
+        }
+
+        return await self.fetch_json(self.url('swarm/peers'), params=params)
 
     async def addrs(self):
         return await self.fetch_json(self.url('swarm/addrs'))
@@ -1087,7 +1282,7 @@ class TarAPI(SubAPI):
                                     params=params)
 
     async def add(self, tar):
-        if not os.path.exists(tar):
+        if not os.path.isfile(tar):
             raise Exception('TAR file does not exist')
 
         with multi.FormDataWriter() as mpwriter:
@@ -1098,32 +1293,33 @@ class TarAPI(SubAPI):
                 return await response.json()
 
 
-class StatsAPI(SubAPI):
-    async def bw(self):
-        return await self.fetch_json(self.url('stats/bw'))
-
-    async def bitswap(self):
-        return await self.fetch_json(self.url('stats/bitswap'))
-
-    async def repo(self):
-        return await self.fetch_json(self.url('stats/repo'))
+class UrlStoreAPI(SubAPI):
+    async def add(self, url, trickle=False):
+        """ Add URL via urlstore """
+        params = {
+            ARG_PARAM: url,
+            'trickle': boolarg(trickle)
+        }
+        return await self.fetch_json(self.url('urlstore/add'),
+                                     params=params)
 
 
 class CoreAPI(SubAPI):
-    def _add_post(self, data, params={}):
+    def _add_post(self, data, params=None):
         return self.driver.session.post(self.url('add'), data=data,
-                                        params=params)
+                                        params=params if params else {})
 
-    async def add_single(self, mpart, params={}):
+    async def add_single(self, mpart, params=None):
         """
         Add a single-entry multipart (used by add_{bytes,str,json})
         """
 
-        async with self._add_post(mpart, params=params) as response:
+        async with self._add_post(
+                mpart, params=params if params else {}) as response:
             return await response.json()
 
     @async_generator
-    async def add_generic(self, mpart, params={}):
+    async def add_generic(self, mpart, params=None):
         """
         Add a multiple-entry multipart, and yield the JSON message for every
         entry added. We use mjson_decode with the post method.
@@ -1133,7 +1329,7 @@ class CoreAPI(SubAPI):
                 self.url('add'),
                 method='post',
                 data=mpart,
-                params=params):
+                params=params if params else {}):
             await yield_(added)
 
     async def add_bytes(self, data):
@@ -1166,7 +1362,8 @@ class CoreAPI(SubAPI):
                   silent=False, progress=False, trickle=False, fscache=False,
                   only_hash=False, wrap_with_directory=False, pin=True,
                   raw_leaves=False, nocopy=False, hidden=False,
-                  cid_version=None):
+                  inline=False, inline_limit=32,
+                  cid_version=None, chunker=None):
         """
         Add a file or directory to ipfs.
 
@@ -1208,6 +1405,13 @@ class CoreAPI(SubAPI):
 
         if cid_version is not None and isinstance(cid_version, int):
             params['cid-version'] = str(cid_version)
+
+        if isinstance(chunker, str):
+            params['chunker'] = chunker
+
+        if inline is True:
+            params['inline'] = boolarg(inline)
+            params['inline-limit'] = str(inline_limit)
 
         all_files = []
         for fitem in files:
@@ -1292,7 +1496,7 @@ class CoreAPI(SubAPI):
         return await self.fetch_raw(self.url('cat'), params=params)
 
     async def get(self, multihash, dstdir='.', compress=False,
-                  compression_level=-1, archive=True,
+                  compression_level=-1, archive=True, output=None,
                   progress_callback=None, progress_callback_arg=None,
                   chunk_size=16384):
         """
@@ -1305,14 +1509,15 @@ class CoreAPI(SubAPI):
         :param bool archive: Output a TAR archive
         """
 
-        opts = {
+        params = {
             ARG_PARAM: multihash,
             'compress': boolarg(compress),
             'compression-level': str(compression_level),
             'archive': boolarg(archive)
         }
-        progress_callback = progress_callback
-        progress_callback_arg = progress_callback_arg
+
+        if isinstance(output, str):
+            params['output'] = output
 
         archive_path = tempfile.mkstemp(prefix='aioipfs')[1]
 
@@ -1323,9 +1528,9 @@ class CoreAPI(SubAPI):
         read_so_far = 0
         async with aiofiles.open(archive_path, 'wb') as fd:
             async with self.driver.session.get(self.url('get'),
-                                               params=opts) as response:
+                                               params=params) as response:
                 if response.status != 200:
-                    return False
+                    raise aioipfs.APIError(http_status=response.status)
 
                 while True:
                     chunk = await response.content.read(chunk_size)
@@ -1334,7 +1539,7 @@ class CoreAPI(SubAPI):
 
                     read_so_far += len(chunk)
 
-                    if callable(progress_callback):
+                    if asyncio.iscoroutinefunction(progress_callback):
                         await progress_callback(multihash, read_so_far,
                                                 progress_callback_arg)
 
@@ -1345,7 +1550,7 @@ class CoreAPI(SubAPI):
 
         def extract():
             # Synchronous tar extraction runs in the executor
-            mode = 'r|gz' if opts['compress'] == 'True' else 'r|'
+            mode = 'r|gz' if compress is True else 'r|'
             try:
                 with tarfile.open(name=archive_path, mode=mode) as tf:
                     tf.extractall(path=dstdir)
@@ -1403,9 +1608,19 @@ class CoreAPI(SubAPI):
         """ Shut down the ipfs daemon """
         return await self.fetch_text(self.url('shutdown'))
 
-    async def version(self):
-        """ Show ipfs version information """
-        return await self.fetch_json(self.url('version'))
+    async def version(self, number=True, commit=True, repo=True,
+                      all=True):
+        """
+        Show ipfs version information
+        """
+        params = {
+            'number': boolarg(number),
+            'commit': boolarg(commit),
+            'repo': boolarg(repo),
+            'all': boolarg(all)
+        }
+
+        return await self.fetch_json(self.url('version'), params=params)
 
     async def dns(self, name, recursive=False):
         """
@@ -1419,3 +1634,22 @@ class CoreAPI(SubAPI):
             'recursive': boolarg(recursive)
         }
         return await self.fetch_json(self.url('dns'), params=params)
+
+    async def resolve(self, name, recursive=False,
+                      dht_record_count=None, dht_timeout=None):
+        """
+        Resolve the value of names to IPFS
+        """
+
+        params = {
+            ARG_PARAM: name,
+            'recursive': boolarg(recursive),
+        }
+
+        if isinstance(dht_record_count, int):
+            params['dht-record-count'] = str(dht_record_count)
+
+        if isinstance(dht_timeout, int):
+            params['dht-timeout'] = str(dht_timeout)
+
+        return await self.fetch_json(self.url('resolve'), params=params)

@@ -101,7 +101,7 @@ Requirements
 License
 =======
 
-**aioipfs** is offered under the GNU GPL3 license.
+**aioipfs** is offered under the GNU Lesser GPL3 (LGPL3) license.
 
 Author
 ======

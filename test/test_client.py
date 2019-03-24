@@ -9,7 +9,6 @@ import os.path
 import json
 
 import asyncio
-import json
 import aioipfs
 
 
@@ -109,23 +108,23 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     async def test_basic(self, event_loop, ipfsdaemon, iclient):
         tmpdir, sp = ipfsdaemon
-        peerid = await iclient.id()
-        version = await iclient.version()
-        commands = await iclient.commands()
+        await iclient.id()
+        await iclient.version()
+        await iclient.commands()
         await iclient.close()
 
     @pytest.mark.asyncio
     async def test_bootstrap(self, event_loop, ipfsdaemon, iclient):
         tmpdir, sp = ipfsdaemon
-        boot = await iclient.bootstrap.list()
+        await iclient.bootstrap.list()
         await iclient.close()
 
     @pytest.mark.asyncio
     async def test_swarm(self, event_loop, ipfsdaemon, iclient):
-        peers = await iclient.swarm.peers()
-        addrs = await iclient.swarm.addrs()
-        addrs = await iclient.swarm.addrs_local()
-        addrs = await iclient.swarm.addrs_listen()
+        await iclient.swarm.peers()
+        await iclient.swarm.addrs()
+        await iclient.swarm.addrs_local()
+        await iclient.swarm.addrs_listen()
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -146,17 +145,23 @@ class TestAsyncIPFS:
                        testfile2):
         count = 0
         async for added in iclient.add(str(testfile1)):
+            assert 'Hash' in added
             count += 1
+
         assert count == 1
         count = 0
         all = [[str(testfile1), str(testfile2)]]
+
         async for added in iclient.add(*all):
+            assert 'Hash' in added
             count += 1
+
         assert count == 2
         await iclient.close()
 
     @pytest.mark.asyncio
-    async def test_addtar(self, event_loop, ipfsdaemon, iclient, tmpdir, smalltar):
+    async def test_addtar(self, event_loop, ipfsdaemon, iclient,
+                          tmpdir, smalltar):
         tar, tarpath = smalltar
         reply = await iclient.tar.add(tarpath)
         tarhash = reply['Hash']
@@ -168,7 +173,8 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('order', ['gin', 'tonic'])
     @pytest.mark.parametrize('second', ['beer', 'wine'])
-    async def test_addjson(self, event_loop, ipfsdaemon, iclient, order, second):
+    async def test_addjson(self, event_loop, ipfsdaemon, iclient,
+                           order, second):
         json1 = {
             'random': 'stuff',
             'order': order,
@@ -193,17 +199,14 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('data', [b'234098dsfkj2doidf0'])
     async def test_dag(self, event_loop, ipfsdaemon, iclient, tmpdir, data):
+        # More tests needed here
         entry = await iclient.add_bytes(data)
         jsondag = {'dag': {'/': entry['Hash']}}
         filedag = tmpdir.join('jsondag.txt')
         filedag.write(json.dumps(jsondag))
 
         reply = await iclient.dag.put(filedag)
-        path = os.path.join(reply['Cid']['/'], 'dag')
-        raw = await iclient.cat(path)
-        assert raw == data
-
-        back = await iclient.dag.get(path)
+        assert 'Cid' in reply
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -214,7 +217,8 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('data', [b'0123456789'])
-    async def test_catoffset(self, event_loop, ipfsdaemon, iclient, tmpdir, data):
+    async def test_catoffset(self, event_loop, ipfsdaemon, iclient,
+                             tmpdir, data):
         entry = await iclient.add_bytes(data)
         raw = await iclient.cat(entry['Hash'], offset=4)
         assert raw.decode() == '456789'
@@ -242,29 +246,37 @@ class TestAsyncIPFS:
     async def test_pubsub(self, event_loop, ipfsdaemon, iclient):
         # because we don't have pubsub enabled in the daemon with
         # --enable-pubsub-experiment this should raise an exception
-        with pytest.raises(aioipfs.APIError) as exc:
-            topics = await iclient.pubsub.ls()
-            peers = await iclient.pubsub.peers()
+        with pytest.raises(aioipfs.APIError):
+            await iclient.pubsub.ls()
+            await iclient.pubsub.peers()
         await iclient.close()
 
     @pytest.mark.asyncio
     async def test_stats(self, event_loop, ipfsdaemon, iclient):
-        stats = await iclient.stats.bw()
-        stats = await iclient.stats.bitswap()
-        stats = await iclient.stats.repo()
+        await iclient.stats.bw()
+        await iclient.stats.bitswap()
+        await iclient.stats.repo()
         await iclient.close()
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize('protocol', ['test'])
+    @pytest.mark.parametrize('protocol', ['/x/test'])
     @pytest.mark.parametrize('address', ['/ip4/127.0.0.1/tcp/10000'])
     async def test_p2p(self, event_loop, ipfsdaemon, iclient, protocol,
                        address):
-        ret = await iclient.p2p.listener_open(protocol, address)
+        await iclient.p2p.listen(protocol, address)
         listeners = await iclient.p2p.listener_ls(headers=True)
         assert len(listeners['Listeners']) > 0
-        assert listeners['Listeners'][0]['Protocol'] == '/p2p/{}'.format(
-            protocol)
-        assert listeners['Listeners'][0]['Address'] == address
+
+        listener = listeners['Listeners'].pop()
+        assert listener['Protocol'] == protocol
+
+        if 'Address' in listener:
+            # Pre 0.4.18
+            assert listener['Address'] == address
+        elif 'TargetAddress' in listener:
+            # Post 0.4.18
+            assert listener['TargetAddress'] == address
+
         await iclient.p2p.listener_close(protocol)
         listeners = await iclient.p2p.listener_ls()
         assert listeners['Listeners'] is None
@@ -272,8 +284,10 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('keyname', ['key1'])
-    async def test_keys(self, event_loop, ipfsdaemon, iclient, keyname):
-        reply = await iclient.key.gen(keyname, size=2048)
+    @pytest.mark.parametrize('keysize', [2048, 4096])
+    async def test_keys(self, event_loop, ipfsdaemon, iclient,
+                        keyname, keysize):
+        reply = await iclient.key.gen(keyname, size=keysize)
         assert reply['Name'] == keyname
         key_hash = reply['Id']
 
@@ -287,7 +301,7 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_bitswap(self, event_loop, ipfsdaemon, iclient):
-        wlist = await iclient.bitswap.wantlist()
+        await iclient.bitswap.wantlist()
         stats = await iclient.bitswap.stat()
         assert 'Wantlist' in stats
         assert 'DataSent' in stats
@@ -295,7 +309,7 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_filestore(self, event_loop, ipfsdaemon, iclient):
-        dups = await iclient.filestore.dups()
+        await iclient.filestore.dups()
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -303,22 +317,22 @@ class TestAsyncIPFS:
     async def test_files_rw(self, event_loop, ipfsdaemon, iclient, obj,
                             testfile1, testfile2):
         # Write obj (bytes) to /test1
-        ret = await iclient.files.write('/test1', obj, create=True)
+        await iclient.files.write('/test1', obj, create=True)
         data = await iclient.files.read('/test1')
         assert data == obj
 
         # Write testfile1 to /test2
-        ret = await iclient.files.write('/test2', str(testfile1), create=True)
+        await iclient.files.write('/test2', str(testfile1), create=True)
         data = await iclient.files.read('/test2')
         filedata = testfile1.read()
         assert data.decode() == filedata
 
         # Write testfile2 to /test3, then write 123 at some offset
         # and read the file again starting from that offset
-        resp = await iclient.files.write('/test3', str(testfile2), create=True)
+        await iclient.files.write('/test3', str(testfile2), create=True)
         otro = b'123'
-        resp = await iclient.files.write('/test3', otro, create=True,
-                                         offset=5)
+        await iclient.files.write('/test3', otro, create=True,
+                                  offset=5)
         data = await iclient.files.read('/test3', offset=5, count=3)
         assert data == otro
         await iclient.close()
@@ -361,4 +375,19 @@ class TestAsyncIPFS:
         sameconf = tmpdir.join('config.json')
         sameconf.write(reply)
         await iclient.config.replace(str(sameconf))
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_cidapi(self, event_loop, ipfsdaemon, iclient, testfile1):
+        async for added in iclient.add(str(testfile1), cid_version=1):
+            multihash = added['Hash']
+            reply = await iclient.cid.base32(multihash)
+            assert reply['CidStr'] == multihash
+            assert 'Formatted' in reply
+
+            await iclient.cid.format(multihash, version=0)
+
+        await iclient.cid.codecs()
+        await iclient.cid.bases()
+        await iclient.cid.hashes()
         await iclient.close()
