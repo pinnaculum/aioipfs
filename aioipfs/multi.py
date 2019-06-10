@@ -9,22 +9,23 @@ from aiohttp import payload
 
 class FormDataWriter(aiohttp.MultipartWriter):
     def __init__(self):
-        super().__init__(subtype="form-data")
+        super().__init__(subtype='form-data')
 
 
-def multiform_bytes(bytes):
+def multiform_bytes(bytes, name=''):
     with FormDataWriter() as mpwriter:
         part = payload.BytesPayload(bytes)
-        part.set_content_disposition('form-data', filename='')
+        part.set_content_disposition('form-data',
+                                     name=name, filename=name)
         mpwriter.append_payload(part)
         return mpwriter
 
 
-def multiform_json(json):
+def multiform_json(json, name=''):
     with FormDataWriter() as mpwriter:
         part = payload.JsonPayload(json)
-        part.set_content_disposition('form-data', name='',
-                                     filename='')
+        part.set_content_disposition('form-data',
+                                     name=name, filename=name)
         mpwriter.append_payload(part)
         return mpwriter
 

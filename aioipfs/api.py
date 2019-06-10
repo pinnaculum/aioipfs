@@ -571,7 +571,8 @@ class ConfigAPI(SubAPI):
 
 
 class DagAPI(SubAPI):
-    async def put(self, filename, format='cbor', input_enc='json', pin=False):
+    async def put(self, filename, format='cbor', input_enc='json',
+                  pin=False, offline=False):
         """
         Add a DAG node to IPFS
 
@@ -579,6 +580,7 @@ class DagAPI(SubAPI):
         :param str format: format to use for the object inside IPFS
         :param str input_enc: object input encoding
         :param bool pin: pin the object after adding (default is False)
+        :param bool offline: Offline mode (no announce)
         """
 
         if not os.path.isfile(filename):
@@ -587,7 +589,8 @@ class DagAPI(SubAPI):
         params = {
             'format': format,
             'input-enc': input_enc,
-            'pin': boolarg(pin)
+            'pin': boolarg(pin),
+            'offline': boolarg(offline)
         }
 
         basename = os.path.basename(filename)
@@ -650,6 +653,7 @@ class DhtAPI(SubAPI):
         return await self.fetch_json(self.url('dht/put'),
                                      params=quote_args(key, value))
 
+    @async_generator
     async def provide(self, multihash, verbose=False, recursive=False):
         params = {
             ARG_PARAM: multihash,
@@ -657,10 +661,9 @@ class DhtAPI(SubAPI):
             'recursive': boolarg(recursive)
         }
 
-        return await self.fetch_json(
-            self.url('dht/provide'),
-            params=params
-        )
+        async for value in self.mjson_decode(
+                self.url('dht/provide'), params=params):
+            await yield_(value)
 
     @async_generator
     async def query(self, peerid, verbose=False):
@@ -747,7 +750,6 @@ class FilesAPI(SubAPI):
 
         if isinstance(format, str):
             params['format'] = format
-
 
         return await self.fetch_json(self.url('files/stat'),
                                      params=params)
@@ -926,6 +928,28 @@ class NameAPI(SubAPI):
 
         return await self.fetch_json(self.url('name/resolve'),
                                      params=params)
+
+    @async_generator
+    async def resolve_stream(self, name=None, recursive=True, nocache=False,
+                             dht_record_count=None, dht_timeout=None,
+                             stream=True):
+        params = {
+            'recursive': boolarg(recursive),
+            'nocache': boolarg(nocache),
+            'stream': boolarg(stream)
+        }
+
+        if isinstance(dht_record_count, int):
+            params['dht-record-count'] = str(dht_record_count)
+        if isinstance(dht_timeout, int):
+            params['dht-timeout'] = str(dht_timeout)
+
+        if name:
+            params[ARG_PARAM] = name
+
+        async for entry in self.mjson_decode(
+                self.url('name/resolve'), params=params):
+            await yield_(entry)
 
 
 class ObjectPatchAPI(SubAPI):
@@ -1293,18 +1317,45 @@ class TarAPI(SubAPI):
                 return await response.json()
 
 
-class UrlStoreAPI(SubAPI):
-    async def add(self, url, trickle=False):
-        """ Add URL via urlstore """
-        params = {
-            ARG_PARAM: url,
-            'trickle': boolarg(trickle)
-        }
-        return await self.fetch_json(self.url('urlstore/add'),
-                                     params=params)
-
-
 class CoreAPI(SubAPI):
+    def _build_add_params(self, **kwargs):
+        """
+        Used by the different coroutines that post on the 'add' endpoint
+        """
+
+        params = {
+            'fscache': boolarg(kwargs.pop('fscache', False)),
+            'hidden': boolarg(kwargs.pop('hidden', False)),
+            'nocopy': boolarg(kwargs.pop('nocopy', False)),
+            'only-hash': boolarg(kwargs.pop('only_hash', False)),
+            'offline': boolarg(kwargs.pop('offline', False)),
+            'pin': boolarg(kwargs.pop('pin', False)),
+            'quiet': boolarg(kwargs.pop('quiet', False)),
+            'quieter': boolarg(kwargs.pop('quieter', False)),
+            'raw-leaves': boolarg(kwargs.pop('raw_leaves', False)),
+            'recursive': boolarg(kwargs.pop('recursive', False)),
+            'silent': boolarg(kwargs.pop('silent', False)),
+            'trickle': boolarg(kwargs.pop('trickle', False)),
+            'dereference-args': boolarg(kwargs.pop('dereference_args', False)),
+            'wrap-with-directory': boolarg(kwargs.pop(
+                'wrap_with_directory', False))
+        }
+
+        cid_v = kwargs.pop('cid_version', None)
+        if isinstance(cid_v, int):
+            params['cid-version'] = str(cid_v)
+
+        chunker = kwargs.pop('chunker', None)
+        if isinstance(chunker, str):
+            params['chunker'] = chunker
+
+        inline = kwargs.pop('inline', False)
+        if inline is True:
+            params['inline'] = boolarg(inline)
+            params['inline-limit'] = str(kwargs.pop('inline_limit', 32))
+
+        return params
+
     def _add_post(self, data, params=None):
         return self.driver.session.post(self.url('add'), data=data,
                                         params=params if params else {})
@@ -1332,42 +1383,43 @@ class CoreAPI(SubAPI):
                 params=params if params else {}):
             await yield_(added)
 
-    async def add_bytes(self, data):
+    async def add_bytes(self, data, **kwargs):
         """
         Add a file using given bytes as data.
 
         :param bytes data: file data
         """
-        return await self.add_single(multi.multiform_bytes(data))
+        return await self.add_single(multi.multiform_bytes(data),
+                                     params=self._build_add_params(**kwargs))
 
-    async def add_str(self, data, codec='utf-8'):
+    async def add_str(self, data, name='', codec='utf-8', **kwargs):
         """
         Add a file using given string as data
 
         :param str data: string data
         :param str codec: input codec, default utf-8
         """
-        return await self.add_single(multi.multiform_bytes(data.encode(codec)))
+        return await self.add_single(multi.multiform_bytes(
+            data.encode(codec), name=name),
+            params=self._build_add_params(**kwargs))
 
-    async def add_json(self, data):
+    async def add_json(self, data, **kwargs):
         """
         Add a JSON object
 
         :param str data: json object
         """
-        return await self.add_single(multi.multiform_json(data))
+        return await self.add_single(multi.multiform_json(data),
+                                     params=self._build_add_params(**kwargs))
 
     @async_generator
-    async def add(self, *files, recursive=False, quiet=False, quieter=False,
-                  silent=False, progress=False, trickle=False, fscache=False,
-                  only_hash=False, wrap_with_directory=False, pin=True,
-                  raw_leaves=False, nocopy=False, hidden=False,
-                  inline=False, inline_limit=32,
-                  cid_version=None, chunker=None):
+    async def add(self, *files, **kwargs):
         """
         Add a file or directory to ipfs.
 
         This is an async generator yielding an IPFS entry for every file added.
+
+        The add_json, add_bytes and add_str coroutines support the same options
 
         :param files: A list of files/directories to be added to
             the IPFS repository
@@ -1383,35 +1435,15 @@ class CoreAPI(SubAPI):
         :param bool raw_leaves: Use raw blocks for leaf nodes.
         :param bool nocopy: Add the file using filestore.
         :param bool fscache: Check the filestore for preexisting blocks.
+        :param bool offline: Offline mode (do not announce)
         :param bool hidden: Include files that are hidden. Only takes effect on
             recursive add.
+        :param bool inline: Inline small blocks into CIDs
+        :param int inline_limit: Maximum block size to inline
         :param int cid_version: CID version
         """
 
-        params = {
-            'trickle': boolarg(trickle),
-            'only-hash': boolarg(only_hash),
-            'wrap-with-directory': boolarg(wrap_with_directory),
-            'pin': boolarg(pin),
-            'hidden': boolarg(hidden),
-            'quiet': boolarg(quiet),
-            'quieter': boolarg(quieter),
-            'silent': boolarg(silent),
-            'raw-leaves': boolarg(raw_leaves),
-            'nocopy': boolarg(nocopy),
-            'fscache': boolarg(fscache),
-            'recursive': boolarg(recursive)
-        }
-
-        if cid_version is not None and isinstance(cid_version, int):
-            params['cid-version'] = str(cid_version)
-
-        if isinstance(chunker, str):
-            params['chunker'] = chunker
-
-        if inline is True:
-            params['inline'] = boolarg(inline)
-            params['inline-limit'] = str(inline_limit)
+        params = self._build_add_params(**kwargs)
 
         all_files = []
         for fitem in files:

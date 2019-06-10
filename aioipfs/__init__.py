@@ -1,10 +1,11 @@
-__version__ = '0.3.9'
+__version__ = '0.4.1'
 
 from yarl import URL
 from distutils.version import StrictVersion
 
 import asyncio
 import aiohttp
+import re
 
 from aioipfs import api
 
@@ -87,7 +88,6 @@ class AsyncIPFS(object):
         self.swarm = api.SwarmAPI(self)
         self.tar = api.TarAPI(self)
         self.stats = api.StatsAPI(self)
-        self.urlstore = api.UrlStoreAPI(self)
 
         self._agent_version = None
 
@@ -187,6 +187,7 @@ class AsyncIPFS(object):
         """
         try:
             node_vs = await self.agent_version_get()
+            node_vs = re.sub('(-.*$)', '', node_vs)
             version_node = StrictVersion(node_vs)
             version_ref = StrictVersion(version)
             return version_node >= version_ref
