@@ -16,8 +16,6 @@ from aiohttp.web_exceptions import (HTTPError,
                                     HTTPInternalServerError,
                                     HTTPServerError, HTTPBadRequest)
 
-from async_generator import async_generator, yield_
-
 from . import multi
 
 ARG_PARAM = 'arg'
@@ -153,8 +151,11 @@ class SubAPI(object):
             else:
                 raise Exception('Unknown output format {0}'.format(outformat))
 
-    @async_generator
-    async def mjson_decode(self, url, method='get', data=None, params={}):
+    async def mjson_decode(self, url, method='get', data=None,
+                           params=None, headers=None,
+                           new_session=False,
+                           timeout=60.0 * 10,
+                           read_timeout=60.0 * 5):
         """
         Multiple JSON objects response decoder (async generator), used for
         the API endpoints which return multiple JSON messages
@@ -164,18 +165,27 @@ class SubAPI(object):
         :param params: http params
         """
 
-        fn = None
-        kwargs = {'params': params}
-        if method == 'get':
-            fn = self.driver.session.get
-        elif method == 'post':
-            fn = self.driver.session.post
-            if data is not None:
-                kwargs['data'] = data
+        kwargs = {'params': params if isinstance(params, dict) else {}}
+
+        if new_session is True:
+            session = self.driver.get_session(
+                conntimeout=timeout,
+                readtimeout=read_timeout
+            )
         else:
+            session = self.driver.session
+
+        if method not in ['get', 'post']:
             raise ValueError('mjson_decode: unknown method')
 
-        async with fn(url, **kwargs) as response:
+        if method == 'post':
+            if data is not None:
+                kwargs['data'] = data
+
+        if isinstance(headers, dict):
+            kwargs['headers'] = headers
+
+        async with getattr(session, method)(url, **kwargs) as response:
             async for raw_message in response.content:
                 message = decode_json(raw_message)
 
@@ -185,9 +195,12 @@ class SubAPI(object):
                                                message=message['Message'],
                                                http_status=response.status)
                     else:
-                        await yield_(message)
+                        yield message
 
                 await asyncio.sleep(0)
+
+        if new_session is True:
+            await session.close()
 
 
 class P2PAPI(SubAPI):
@@ -631,7 +644,6 @@ class DhtAPI(SubAPI):
             params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
         )
 
-    @async_generator
     async def findprovs(self, key, verbose=False, numproviders=20):
         params = {
             ARG_PARAM: key,
@@ -641,7 +653,7 @@ class DhtAPI(SubAPI):
 
         async for value in self.mjson_decode(self.url('dht/findprovs'),
                                              params=params):
-            await yield_(value)
+            yield value
 
     async def get(self, peerid, verbose=False):
         return await self.fetch_json(
@@ -653,7 +665,6 @@ class DhtAPI(SubAPI):
         return await self.fetch_json(self.url('dht/put'),
                                      params=quote_args(key, value))
 
-    @async_generator
     async def provide(self, multihash, verbose=False, recursive=False):
         params = {
             ARG_PARAM: multihash,
@@ -663,14 +674,13 @@ class DhtAPI(SubAPI):
 
         async for value in self.mjson_decode(
                 self.url('dht/provide'), params=params):
-            await yield_(value)
+            yield value
 
-    @async_generator
     async def query(self, peerid, verbose=False):
         async for value in self.mjson_decode(
                 self.url('dht/query'),
                 params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}):
-            await yield_(value)
+            yield value
 
 
 class DiagAPI(SubAPI):
@@ -845,7 +855,6 @@ class KeyAPI(SubAPI):
 
 
 class LogAPI(SubAPI):
-    @async_generator
     async def tail(self):
         """
         Read the event log.
@@ -855,7 +864,7 @@ class LogAPI(SubAPI):
         """
 
         async for log in self.mjson_decode(self.url('log/tail')):
-            await yield_(log)
+            yield log
 
     async def ls(self):
         """ List the logging subsystems """
@@ -929,7 +938,6 @@ class NameAPI(SubAPI):
         return await self.fetch_json(self.url('name/resolve'),
                                      params=params)
 
-    @async_generator
     async def resolve_stream(self, name=None, recursive=True, nocache=False,
                              dht_record_count=None, dht_timeout=None,
                              stream=True):
@@ -949,7 +957,7 @@ class NameAPI(SubAPI):
 
         async for entry in self.mjson_decode(
                 self.url('name/resolve'), params=params):
-            await yield_(entry)
+            yield entry
 
 
 class ObjectPatchAPI(SubAPI):
@@ -1065,7 +1073,6 @@ class ObjectAPI(SubAPI):
 
 
 class PinAPI(SubAPI):
-    @async_generator
     async def add(self, multihash, recursive=True, progress=True):
         """
         Pin objects to local storage.
@@ -1080,7 +1087,7 @@ class PinAPI(SubAPI):
 
         async for added in self.mjson_decode(
                 self.url('pin/add'), params=params):
-            await yield_(added)
+            yield added
 
     async def ls(self, multihash=None, pintype='all', quiet=False):
         """
@@ -1158,10 +1165,9 @@ class PubSubAPI(SubAPI):
         :param str data: message data
         """
 
-        return await self.fetch_text(self.url('pubsub/pub'),
-                                     params=quote_args(topic, data))
+        return await self.post(self.url('pubsub/pub'),
+                               None, params=quote_args(topic, data))
 
-    @async_generator
     async def sub(self, topic, discover=True):
         """
         Subscribe to messages on a given topic.
@@ -1174,17 +1180,24 @@ class PubSubAPI(SubAPI):
             the same topic
         """
 
-        params = {ARG_PARAM: topic, 'discover': boolarg(discover)}
+        params = {ARG_PARAM: topic, 'discover': boolarg(discover),
+                  'stream-channels': boolarg(True)}
 
-        async for message in self.mjson_decode(self.url('pubsub/sub'),
-                                               params=params):
+        async for message in self.mjson_decode(
+                self.url('pubsub/sub'),
+                method='post',
+                headers={'Connection': 'Close'},
+                new_session=True,
+                read_timeout=60.0 * 10,
+                timeout=60.0 * 60 * 24 * 8,
+                params=params):
             try:
                 converted = self.decode_message(message)
             except Exception:
                 print('Could not decode pubsub message ({0})'.format(topic),
                       file=sys.stderr)
             else:
-                await yield_(converted)
+                yield converted
 
             await asyncio.sleep(0)
 
@@ -1204,10 +1217,9 @@ class PubSubAPI(SubAPI):
 
 
 class RefsAPI(SubAPI):
-    @async_generator
     async def local(self):
         async for ref in self.mjson_decode(self.url('refs/local')):
-            await yield_(ref)
+            yield ref
 
 
 class RepoAPI(SubAPI):
@@ -1369,7 +1381,6 @@ class CoreAPI(SubAPI):
                 mpart, params=params if params else {}) as response:
             return await response.json()
 
-    @async_generator
     async def add_generic(self, mpart, params=None):
         """
         Add a multiple-entry multipart, and yield the JSON message for every
@@ -1381,7 +1392,7 @@ class CoreAPI(SubAPI):
                 method='post',
                 data=mpart,
                 params=params if params else {}):
-            await yield_(added)
+            yield added
 
     async def add_bytes(self, data, **kwargs):
         """
@@ -1412,7 +1423,6 @@ class CoreAPI(SubAPI):
         return await self.add_single(multi.multiform_json(data),
                                      params=self._build_add_params(**kwargs))
 
-    @async_generator
     async def add(self, *files, **kwargs):
         """
         Add a file or directory to ipfs.
@@ -1493,7 +1503,7 @@ class CoreAPI(SubAPI):
                 raise aioipfs.UnknownAPIError('Multipart is empty')
 
             async for value in self.add_generic(mpwriter, params=params):
-                await yield_(value)
+                yield value
 
     async def commands(self):
         """ List all available commands."""
@@ -1622,7 +1632,6 @@ class CoreAPI(SubAPI):
         }
         return await self.fetch_json(self.url('mount'), params=params)
 
-    @async_generator
     async def ping(self, peerid, count=5):
         """
         Send echo request packets to IPFS hosts.
@@ -1634,7 +1643,7 @@ class CoreAPI(SubAPI):
         async for value in self.mjson_decode(
                 self.url('ping'),
                 params={ARG_PARAM: peerid, 'count': str(count)}):
-            await yield_(value)
+            yield value
 
     async def shutdown(self):
         """ Shut down the ipfs daemon """
