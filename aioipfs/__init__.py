@@ -192,7 +192,7 @@ class AsyncIPFS(object):
     async def agent_version_post0418(self):
         return await self.agent_version_superioreq('0.4.18')
 
-    def get_session(self, conntimeout=60.0 * 10, readtimeout=60.0 * 5):
+    def get_session(self, conntimeout=60.0 * 10, readtimeout=0):
         return aiohttp.ClientSession(
             connector=aiohttp.TCPConnector(
                 limit=self._conns_max,

@@ -1188,7 +1188,6 @@ class PubSubAPI(SubAPI):
                 method='post',
                 headers={'Connection': 'Close'},
                 new_session=True,
-                read_timeout=60.0 * 10,
                 timeout=60.0 * 60 * 24 * 8,
                 params=params):
             try:
