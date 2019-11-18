@@ -1,4 +1,4 @@
-__version__ = '0.4.2'
+__version__ = '0.4.3'
 
 from yarl import URL
 from distutils.version import StrictVersion
@@ -42,8 +42,8 @@ class AsyncIPFS(object):
     """
 
     def __init__(self, host='localhost', port=5001, loop=None,
-                 conns_max=0, conns_max_per_host=0, read_timeout=None,
-                 api_version='v0'):
+                 conns_max=0, conns_max_per_host=0,
+                 read_timeout=0, api_version='v0'):
 
         self._conns_max = conns_max
         self._conns_max_per_host = conns_max_per_host
@@ -192,15 +192,15 @@ class AsyncIPFS(object):
     async def agent_version_post0418(self):
         return await self.agent_version_superioreq('0.4.18')
 
-    def get_session(self, conntimeout=60.0 * 10, readtimeout=0):
+    def get_session(self, conn_timeout=60.0 * 30, read_timeout=60.0 * 10):
         return aiohttp.ClientSession(
             connector=aiohttp.TCPConnector(
                 limit=self._conns_max,
                 limit_per_host=self._conns_max_per_host,
                 loop=self.loop
             ), timeout=aiohttp.ClientTimeout(
-                total=conntimeout,
-                sock_read=readtimeout
+                total=conn_timeout,
+                sock_read=read_timeout
             )
         )
 

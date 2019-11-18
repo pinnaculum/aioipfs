@@ -154,8 +154,8 @@ class SubAPI(object):
     async def mjson_decode(self, url, method='get', data=None,
                            params=None, headers=None,
                            new_session=False,
-                           timeout=60.0 * 10,
-                           read_timeout=60.0 * 5):
+                           timeout=60.0 * 60,
+                           read_timeout=60.0 * 10):
         """
         Multiple JSON objects response decoder (async generator), used for
         the API endpoints which return multiple JSON messages
@@ -169,8 +169,8 @@ class SubAPI(object):
 
         if new_session is True:
             session = self.driver.get_session(
-                conntimeout=timeout,
-                readtimeout=read_timeout
+                conn_timeout=timeout,
+                read_timeout=read_timeout
             )
         else:
             session = self.driver.session
@@ -1189,6 +1189,7 @@ class PubSubAPI(SubAPI):
                 headers={'Connection': 'Close'},
                 new_session=True,
                 timeout=60.0 * 60 * 24 * 8,
+                read_timeout=0,
                 params=params):
             try:
                 converted = self.decode_message(message)
