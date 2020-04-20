@@ -32,6 +32,7 @@ setup(
     version=version,
     license='LGPLv3',
     author='David Ferlier',
+    author_email='galacteek@protonmail.com',
     url='https://gitlab.com/cipres/aioipfs',
     description='Asynchronous IPFS client library',
     long_description=long_description,
@@ -46,7 +47,7 @@ setup(
         'Development Status :: 4 - Beta',
         'Natural Language :: English',
         'Operating System :: OS Independent',
-        'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
+        'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',  # noqa
         'Topic :: System :: Filesystems'
     ],
     keywords=[

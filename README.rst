@@ -4,7 +4,7 @@ aioipfs
 
 :info: Asynchronous IPFS_ client library
 
-**aioipfs** is a python3 library providing an asynchronous API for IPFS_,
+**aioipfs** is a python3 library providing an asynchronous API for IPFS_
 
 Installation
 ============
@@ -86,8 +86,7 @@ event loop. TAR extraction is done in asyncio's threadpool.
 Requirements
 ============
 
-- Python >= 3.5.3
-- async-generator_
+- Python >= 3.6
 - aiohttp_
 - aiofiles_
 - yarl_
@@ -102,8 +101,3 @@ License
 =======
 
 **aioipfs** is offered under the GNU Lesser GPL3 (LGPL3) license.
-
-Author
-======
-
-David Ferlier

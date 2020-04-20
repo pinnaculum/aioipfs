@@ -191,9 +191,16 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('data', [b'234098dsfkj2doidf0'])
     async def test_addbytes(self, event_loop, ipfsdaemon, iclient, data):
-        reply = await iclient.add_bytes(data)
+        reply = await iclient.add_bytes(data, cid_version=1, hash='sha2-256')
+        assert reply['Hash'] == \
+            'bafkreiewqrl3s3cgd4ll3wybtrxv7futfksuylocfxzlugbjparmyyt6eq'
+
         catD = await iclient.cat(reply['Hash'])
         assert catD == data
+
+        reply = await iclient.add_bytes(data, cid_version=1, hash='sha2-512')
+        assert reply['Hash'] == 'bafkrgqdao6vujlzh4z6o7mzgv3jnydftv2of5jy32yufswk7bnvwaq7oyaizo6gnditr4okfphi2cguz2cack27rsjfzuybm57knagzjl6m34'  # noqa
+
         await iclient.close()
 
     @pytest.mark.asyncio

@@ -1335,23 +1335,27 @@ class CoreAPI(SubAPI):
         Used by the different coroutines that post on the 'add' endpoint
         """
 
-        params = {
-            'fscache': boolarg(kwargs.pop('fscache', False)),
-            'hidden': boolarg(kwargs.pop('hidden', False)),
-            'nocopy': boolarg(kwargs.pop('nocopy', False)),
-            'only-hash': boolarg(kwargs.pop('only_hash', False)),
-            'offline': boolarg(kwargs.pop('offline', False)),
-            'pin': boolarg(kwargs.pop('pin', False)),
-            'quiet': boolarg(kwargs.pop('quiet', False)),
-            'quieter': boolarg(kwargs.pop('quieter', False)),
-            'raw-leaves': boolarg(kwargs.pop('raw_leaves', False)),
-            'recursive': boolarg(kwargs.pop('recursive', False)),
-            'silent': boolarg(kwargs.pop('silent', False)),
-            'trickle': boolarg(kwargs.pop('trickle', False)),
-            'dereference-args': boolarg(kwargs.pop('dereference_args', False)),
-            'wrap-with-directory': boolarg(kwargs.pop(
-                'wrap_with_directory', False))
-        }
+        params = {}
+        switchlist = [
+            'fscache',
+            'hidden',
+            'nocopy',
+            'only_hash',
+            'offline',
+            'pin',
+            'quiet',
+            'quieter',
+            'raw_leaves',
+            'recursive',
+            'silent',
+            'trickle',
+            'dereference_args',
+            'wrap_with_directory'
+        ]
+
+        for sw, val in kwargs.items():
+            if sw in switchlist:
+                params[sw.replace('_', '-')] = boolarg(val)
 
         cid_v = kwargs.pop('cid_version', None)
         if isinstance(cid_v, int):
@@ -1360,6 +1364,10 @@ class CoreAPI(SubAPI):
         chunker = kwargs.pop('chunker', None)
         if isinstance(chunker, str):
             params['chunker'] = chunker
+
+        hashfn = kwargs.pop('hash', None)
+        if isinstance(hashfn, str):
+            params['hash'] = hashfn
 
         inline = kwargs.pop('inline', False)
         if inline is True:
@@ -1449,6 +1457,7 @@ class CoreAPI(SubAPI):
         :param bool hidden: Include files that are hidden. Only takes effect on
             recursive add.
         :param bool inline: Inline small blocks into CIDs
+        :param str hash: Hash function to use
         :param int inline_limit: Maximum block size to inline
         :param int cid_version: CID version
         """
@@ -1479,23 +1488,38 @@ class CoreAPI(SubAPI):
                     for entry in names:
                         await asyncio.sleep(0)
                         _name, _fd, _ctype = entry[1]
+
                         if _ctype == 'application/x-directory':
                             pay = payload.StringIOPayload(
                                 _fd, content_type=_ctype, filename=_name)
-                            pay.set_content_disposition('file', name=_name,
+                            pay.set_content_disposition('form-data',
+                                                        name='file',
                                                         filename=_name)
                             mpwriter.append_payload(pay)
                         else:
                             pay = payload.BufferedReaderPayload(
-                                _fd, filename=_name)
+                                _fd,
+                                content_type=_ctype,
+                                headers={
+                                    'Abspath': _fd.name
+                                }
+                            )
                             pay.set_content_disposition(
-                                'file', filename=_name, name=_name)
+                                'form-data', name='file', filename=_name)
                             mpwriter.append_payload(pay)
                 else:
                     basename = os.path.basename(filepath)
 
-                    file_payload = payload.BytesIOPayload(open(filepath, 'rb'))
-                    file_payload.set_content_disposition('file', name=basename,
+                    file_payload = payload.BytesIOPayload(
+                        open(filepath, 'rb'),
+                        content_type='application/octet-stream',
+                        headers={
+                            'Abspath': filepath
+                        }
+                    )
+
+                    file_payload.set_content_disposition('form-data',
+                                                         name='file',
                                                          filename=basename)
                     mpwriter.append_payload(file_payload)
 

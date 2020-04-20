@@ -14,9 +14,11 @@ class FormDataWriter(aiohttp.MultipartWriter):
 
 def multiform_bytes(bytes, name=''):
     with FormDataWriter() as mpwriter:
-        part = payload.BytesPayload(bytes)
+        part = payload.BytesPayload(
+            bytes, content_type='application/octet-stream'
+        )
         part.set_content_disposition('form-data',
-                                     name=name, filename=name)
+                                     name='file', filename=name)
         mpwriter.append_payload(part)
         return mpwriter
 
@@ -25,15 +27,20 @@ def multiform_json(json, name=''):
     with FormDataWriter() as mpwriter:
         part = payload.JsonPayload(json)
         part.set_content_disposition('form-data',
-                                     name=name, filename=name)
+                                     name='file', filename=name)
         mpwriter.append_payload(part)
         return mpwriter
 
 
 def bytes_payload_from_file(filepath):
     basename = os.path.basename(filepath)
-    file_payload = payload.BytesIOPayload(open(filepath, 'rb'))
+    file_payload = payload.BytesIOPayload(
+        open(filepath, 'rb'),
+        content_type='application/octet-stream'
+    )
+
     file_payload.set_content_disposition('form-data',
+                                         name='file',
                                          filename=basename)
     return file_payload
 
