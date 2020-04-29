@@ -103,7 +103,7 @@ class SubAPI(object):
             return None, None
 
     async def fetch_text(self, url, params={}, timeout=DEFAULT_TIMEOUT):
-        async with self.driver.session.get(url, params=params) as response:
+        async with self.driver.session.post(url, params=params) as response:
             status, textdata = response.status, await response.text()
             if status in HTTP_ERROR_CODES:
                 msg, code = self.decode_error(textdata)
@@ -112,7 +112,7 @@ class SubAPI(object):
             return textdata
 
     async def fetch_raw(self, url, params={}, timeout=DEFAULT_TIMEOUT):
-        async with self.driver.session.get(url, params=params) as response:
+        async with self.driver.session.post(url, params=params) as response:
             status, data = response.status, await response.read()
             if status in HTTP_ERROR_CODES:
                 msg, code = self.decode_error(data)
@@ -121,7 +121,7 @@ class SubAPI(object):
             return data
 
     async def fetch_json(self, url, params={}, timeout=DEFAULT_TIMEOUT):
-        async with self.driver.session.get(url, params=params) as response:
+        async with self.driver.session.post(url, params=params) as response:
             status, jsondata = response.status, await response.json()
             if status in HTTP_ERROR_CODES:
                 if 'Message' in jsondata and 'Code' in jsondata:
@@ -151,7 +151,7 @@ class SubAPI(object):
             else:
                 raise Exception('Unknown output format {0}'.format(outformat))
 
-    async def mjson_decode(self, url, method='get', data=None,
+    async def mjson_decode(self, url, method='post', data=None,
                            params=None, headers=None,
                            new_session=False,
                            timeout=60.0 * 60,
@@ -616,6 +616,18 @@ class DagAPI(SubAPI):
             return await self.post(self.url('dag/put'), mpwriter,
                                    params=params, outformat='json')
 
+    async def car_export(self, cid, progress=False):
+        """
+        Streams the selected DAG as a .car stream on stdout.
+
+        :param str cid: CID of a root to recursively export
+        """
+
+        return await self.fetch_raw(
+            self.url('dag/export'),
+            params={ARG_PARAM: cid, 'progress': boolarg(progress)}
+        )
+
     async def get(self, objpath):
         """
         Get a DAG node from IPFS
@@ -625,6 +637,59 @@ class DagAPI(SubAPI):
 
         return await self.fetch_text(self.url('dag/get'),
                                      params={ARG_PARAM: objpath})
+
+    async def car_import(self, car, silent=False, pin_roots=True):
+        """
+        Import the contents of .car files
+
+        :param car: path to a .car archive or bytes object
+        :param bool silent: No output
+        :param bool pin_roots: Pin optional roots listed in the
+            .car headers after importing
+        """
+
+        params = {
+            'silent': boolarg(silent),
+            'pin-roots': boolarg(pin_roots)
+        }
+
+        # Build the multipart form for the CAR import
+        with multi.FormDataWriter() as mpwriter:
+            if isinstance(car, str):
+                if not os.path.isfile(car):
+                    raise Exception('CAR file does not exist')
+
+                basename = os.path.basename(car)
+                car_payload = payload.BytesIOPayload(
+                    open(car, 'rb'),
+                    content_type='application/octet-stream'
+                )
+
+                car_payload.set_content_disposition('form-data',
+                                                    name='file',
+                                                    filename=basename)
+            elif isinstance(car, bytes):
+                car_payload = payload.BytesPayload(
+                    car, content_type='application/octet-stream'
+                )
+
+                car_payload.set_content_disposition('form-data',
+                                                    name='file',
+                                                    filename='car')
+            else:
+                raise ValueError(
+                    'Invalid parameter: argument should be '
+                    'a bytes object or a path to a .car archive')
+
+            mpwriter.append_payload(car_payload)
+
+        if mpwriter.size == 0:
+            raise aioipfs.UnknownAPIError('Multipart is empty')
+
+        async with self.driver.session.post(
+            self.url('dag/import'), data=mpwriter,
+                params=params) as response:
+            return await response.json()
 
     async def resolve(self, path):
         """
@@ -1593,8 +1658,8 @@ class CoreAPI(SubAPI):
 
         read_so_far = 0
         async with aiofiles.open(archive_path, 'wb') as fd:
-            async with self.driver.session.get(self.url('get'),
-                                               params=params) as response:
+            async with self.driver.session.post(self.url('get'),
+                                                params=params) as response:
                 if response.status != 200:
                     raise aioipfs.APIError(http_status=response.status)
 

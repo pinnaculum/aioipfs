@@ -217,6 +217,34 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize('data', [b'234098dsfkj2doidf0'])
+    async def test_car(self, event_loop, ipfsdaemon, iclient, tmpdir, data):
+        entry = await iclient.add_bytes(data)
+        jsondag = {'dag': {'/': entry['Hash']}}
+        filedag = tmpdir.join('jsondag.txt')
+        filedag.write(json.dumps(jsondag))
+
+        reply = await iclient.dag.put(filedag)
+        assert 'Cid' in reply
+
+        export = await iclient.dag.car_export(reply['Cid']['/'])
+        assert isinstance(export, bytes)
+
+        imported = await iclient.dag.car_import(export)
+        assert imported['Root']['Cid']['/'] is not None
+        assert reply['Cid']['/'] == imported['Root']['Cid']['/']
+
+        filecar = tempfile.mkstemp()[1]
+        with open(filecar, 'wb') as fd:
+            fd.write(export)
+
+        imported = await iclient.dag.car_import(filecar)
+        assert imported['Root']['Cid']['/'] is not None
+        assert reply['Cid']['/'] == imported['Root']['Cid']['/']
+
+        os.unlink(filecar)
+
+    @pytest.mark.asyncio
     async def test_diag(self, event_loop, ipfsdaemon, iclient, tmpdir):
         reply = await iclient.diag.sys()
         assert 'diskinfo' in reply
