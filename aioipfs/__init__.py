@@ -1,4 +1,4 @@
-__version__ = '0.4.5'
+__version__ = '0.4.6'
 
 from yarl import URL
 from distutils.version import StrictVersion
@@ -168,7 +168,7 @@ class AsyncIPFS(object):
 
                 comps = agent_version.rstrip('/').split('/')
 
-                if len(comps) == 2:
+                if len(comps) >= 2:
                     self._agent_version = comps[1]
 
         return self.agent_version
