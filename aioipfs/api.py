@@ -185,19 +185,25 @@ class SubAPI(object):
         if isinstance(headers, dict):
             kwargs['headers'] = headers
 
-        async with getattr(session, method)(url, **kwargs) as response:
-            async for raw_message in response.content:
-                message = decode_json(raw_message)
+        try:
+            async with getattr(session, method)(url, **kwargs) as response:
+                async for raw_message in response.content:
+                    message = decode_json(raw_message)
 
-                if message is not None:
-                    if 'Message' in message and 'Code' in message:
-                        raise aioipfs.APIError(code=message['Code'],
-                                               message=message['Message'],
-                                               http_status=response.status)
-                    else:
-                        yield message
+                    if message is not None:
+                        if 'Message' in message and 'Code' in message:
+                            raise aioipfs.APIError(code=message['Code'],
+                                                   message=message['Message'],
+                                                   http_status=response.status)
+                        else:
+                            yield message
 
-                await asyncio.sleep(0)
+                    await asyncio.sleep(0)
+        except asyncio.CancelledError as err:
+            if new_session is True:
+                await session.close()
+
+            raise err
 
         if new_session is True:
             await session.close()
@@ -1233,7 +1239,7 @@ class PubSubAPI(SubAPI):
         return await self.post(self.url('pubsub/pub'),
                                None, params=quote_args(topic, data))
 
-    async def sub(self, topic, discover=True):
+    async def sub(self, topic, discover=True, timeout=None, read_timeout=None):
         """
         Subscribe to messages on a given topic.
 
@@ -1253,8 +1259,8 @@ class PubSubAPI(SubAPI):
                 method='post',
                 headers={'Connection': 'Close'},
                 new_session=True,
-                timeout=60.0 * 60 * 24 * 8,
-                read_timeout=0,
+                timeout=timeout if timeout else 60.0 * 60 * 24 * 8,
+                read_timeout=read_timeout if read_timeout else 0,
                 params=params):
             try:
                 converted = self.decode_message(message)
