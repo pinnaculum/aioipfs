@@ -3,6 +3,7 @@ import os.path
 import io
 import re
 
+from aioipfs.gitignore_parser import parse_gitignore
 import aiohttp
 from aiohttp import payload
 
@@ -105,8 +106,15 @@ class DirectoryListing:
                  directory,
                  recursive=False,
                  patterns='**',
+                 hidden=False,
+                 ignrulespath=None,
                  chunk_size=4096):
 
+        self.hidden = hidden
+        self.ignrulespath = ignrulespath
+        self.ign_path = None
+        self.ign_short_name = None
+        self.ignrules = None
         self.patterns = []
         patterns = [patterns] if isinstance(patterns, str) else patterns
         for pattern in patterns:
@@ -118,6 +126,11 @@ class DirectoryListing:
         self.directory = os.path.normpath(directory)
         self.recursive = recursive
 
+        if self.ignrulespath:
+            self.ign_short_name = os.path.join(
+                os.path.basename(self.directory), self.ignrulespath)
+            self.ign_path = os.path.join(self.directory, self.ignrulespath)
+
     def genNames(self):
         """ Returns the file paths inside self.directory
             with associated opened file descriptors """
@@ -125,8 +138,31 @@ class DirectoryListing:
 
         added_directories = set()
 
+        def strip_first(path):
+            try:
+                return os.path.sep.join(path.strip(os.path.sep).split(
+                    os.path.sep)[1:])
+            except Exception:
+                return None
+
+        def hidden_ignore(fpath):
+            if not self.hidden:
+                return any(
+                    p.startswith('.') for p in fpath.split(os.path.sep)
+                )
+
+            return False
+
         def add_directory(short_path):
             # Do not continue if this directory has already been added
+            if hidden_ignore(short_path):
+                return
+
+            dir_unr = strip_first(short_path)
+            if dir_unr and self.ignrules and self.ignrules(dir_unr):
+                # Matches ignore rules
+                return
+
             if short_path in added_directories:
                 return
 
@@ -135,6 +171,7 @@ class DirectoryListing:
             dir_parts = []
             while dir_base:
                 dir_base, dir_name = os.path.split(dir_base)
+
                 dir_parts.append(dir_name)
                 if dir_base in added_directories:
                     break
@@ -154,10 +191,20 @@ class DirectoryListing:
                 # Remember that this directory has already been sent
                 added_directories.add(dir_base)
 
-        def add_file(short_path, full_path):
+        def add_file(short_path, full_path, force=False):
             try:
+                if not full_path == self.ign_path and \
+                        hidden_ignore(short_path):
+                    # Ignore hidden files
+                    return
+
+                short_unr = strip_first(short_path)
+                if short_unr and self.ignrules and self.ignrules(short_unr):
+                    # Matches ignore rules
+                    return
+
                 # Always add files in wildcard directories
-                names.append(('files', (short_name,
+                names.append(('files', (short_path,
                                         open(full_path, 'rb'),
                                         'application/octet-stream')))
             except OSError:
@@ -187,6 +234,15 @@ class DirectoryListing:
         # Errors: `os.walk()` will simply return an empty generator if the
         #         target directory does not exist.
         wildcard_directories = set()
+
+        # Support ignore rules at folder's root
+        if self.ign_path:
+            if os.path.exists(self.ign_path) and not self.ignrules:
+                try:
+                    self.ignrules = parse_gitignore(self.ign_path)
+                except Exception:
+                    self.ignrules = None
+
         for curr_dir, _, files in os.walk(self.directory):
             # find the path relative to the directory being added
             if len(truncate) > 0:
@@ -219,6 +275,7 @@ class DirectoryListing:
             # Iterate across the files in the current directory
             for filename in files:
                 # Find the filename relative to the directory being added
+
                 short_name = os.path.join(short_path, filename)
                 filepath = os.path.join(curr_dir, filename)
 

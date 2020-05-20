@@ -7,6 +7,7 @@ import subprocess
 import os
 import os.path
 import json
+from pathlib import Path
 
 import asyncio
 import aioipfs
@@ -44,6 +45,34 @@ def testfile2(tmpdir):
     for i in range(0, 128):
         filep.write(str(r.randint(i, i * 2)))
     return filep
+
+
+@pytest.fixture
+def hiddendirs(tmpdir):
+    root = Path(str(tmpdir))
+    root.joinpath('a/b/.c').mkdir(parents=True)
+    root.joinpath('a/b/.c/file0').touch()
+    root.joinpath('d/.e/f').mkdir(parents=True)
+    root.joinpath('d/.e/f/.file3').touch()
+    root.joinpath('file1').touch()
+    root.joinpath('.file2').touch()
+    return str(root)
+
+
+@pytest.fixture
+def ignoredirs(tmpdir):
+    root = Path(str(tmpdir))
+    root.joinpath('a/b/.c').mkdir(parents=True)
+    root.joinpath('d/.e/f').mkdir(parents=True)
+    root.joinpath('d/.e/f/.file3').touch()
+    root.joinpath('file1').touch()
+    root.joinpath('README.txt').touch()
+    root.joinpath('README2.txt').touch()
+    root.joinpath('.file2').touch()
+    ign = root.joinpath('.gitignore')
+    ign.touch()
+    ign.write_text("README.txt\n.file2\na**\n\nd/.e/*/*\nd/.e/f\n")
+    return str(root)
 
 
 def ipfs_config(param, value):
@@ -158,6 +187,44 @@ class TestAsyncIPFS:
 
         assert count == 2
         await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_hidden(self, event_loop, ipfsdaemon, iclient, hiddendirs):
+        async for added in iclient.add(hiddendirs, hidden=False):
+            parts = added['Name'].split('/')
+            for part in parts:
+                assert not part.startswith('.')
+
+        names = []
+        async for added in iclient.add(hiddendirs, hidden=True):
+            names.append(added['Name'])
+
+        assert 'test_hidden0/d/.e/f/.file3' in names
+        assert 'test_hidden0/a/b/.c' in names
+
+    @pytest.mark.asyncio
+    async def test_ignorerules(self, event_loop, ipfsdaemon, iclient,
+                               ignoredirs):
+        names = []
+        async for added in iclient.add(ignoredirs,
+                                       ignore_rules_path='.gitignore',
+                                       hidden=True):
+            names.append(added['Name'])
+
+        assert 'test_ignorerules0/.gitignore' in names
+        assert 'test_ignorerules0/.file2' not in names
+        assert 'test_ignorerules0/a' not in names
+        assert 'test_ignorerules0/d/.e/f' not in names
+        assert 'test_ignorerules0/README.txt' not in names
+        assert 'test_ignorerules0/README2.txt' in names
+
+        names = []
+        async for added in iclient.add(ignoredirs,
+                                       ignore_rules_path='.gitignore',
+                                       hidden=False):
+            names.append(added['Name'])
+
+        assert 'test_ignorerules0/.gitignore' in names
 
     @pytest.mark.asyncio
     async def test_addtar(self, event_loop, ipfsdaemon, iclient,
@@ -404,11 +471,10 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_config(self, event_loop, ipfsdaemon, iclient, tmpdir):
-        reply = await iclient.config.show()
-        conf = json.loads(reply)
+        conf = await iclient.config.show()
         assert 'API' in conf
         sameconf = tmpdir.join('config.json')
-        sameconf.write(reply)
+        sameconf.write(json.dumps(conf))
         await iclient.config.replace(str(sameconf))
         await iclient.close()
 

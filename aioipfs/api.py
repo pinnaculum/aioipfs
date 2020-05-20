@@ -6,6 +6,7 @@ import sys
 import base58
 import base64
 from urllib.parse import quote
+from pathlib import Path
 
 import asyncio
 import aiofiles
@@ -557,7 +558,7 @@ class ConfigAPI(SubAPI):
 
     async def show(self):
         """ Outputs IPFS config file contents """
-        return await self.fetch_text(self.url('config/show'))
+        return await self.fetch_json(self.url('config/show'))
 
     async def replace(self, configpath):
         """ Replaces the IPFS configuration with new config file
@@ -1409,10 +1410,8 @@ class CoreAPI(SubAPI):
         params = {}
         switchlist = [
             'fscache',
-            'hidden',
             'nocopy',
             'only_hash',
-            'offline',
             'pin',
             'quiet',
             'quieter',
@@ -1533,14 +1532,19 @@ class CoreAPI(SubAPI):
         :param int cid_version: CID version
         """
 
+        hidden = kwargs.pop('hidden', False)
+        ignrulespath = kwargs.pop('ignore_rules_path', None)
         params = self._build_add_params(**kwargs)
 
+        descriptors = []
         all_files = []
         for fitem in files:
             if isinstance(fitem, list):
                 all_files += fitem
             elif isinstance(fitem, str):
                 all_files.append(fitem)
+            elif isinstance(fitem, Path):
+                all_files.append(str(fitem))
 
         # Build the multipart form and add the files/directories
         with multi.FormDataWriter() as mpwriter:
@@ -1554,7 +1558,9 @@ class CoreAPI(SubAPI):
                     continue
 
                 if os.path.isdir(filepath):
-                    dir_listing = multi.DirectoryListing(filepath)
+                    dir_listing = multi.DirectoryListing(
+                        filepath, hidden=hidden,
+                        ignrulespath=ignrulespath)
                     names = dir_listing.genNames()
                     for entry in names:
                         await asyncio.sleep(0)
@@ -1578,11 +1584,14 @@ class CoreAPI(SubAPI):
                             pay.set_content_disposition(
                                 'form-data', name='file', filename=_name)
                             mpwriter.append_payload(pay)
+
+                        descriptors.append(_fd)
                 else:
                     basename = os.path.basename(filepath)
+                    _fd = open(filepath, 'rb')
 
                     file_payload = payload.BytesIOPayload(
-                        open(filepath, 'rb'),
+                        _fd,
                         content_type='application/octet-stream',
                         headers={
                             'Abspath': filepath
@@ -1593,12 +1602,22 @@ class CoreAPI(SubAPI):
                                                          name='file',
                                                          filename=basename)
                     mpwriter.append_payload(file_payload)
+                    descriptors.append(_fd)
 
             if mpwriter.size == 0:
                 raise aioipfs.UnknownAPIError('Multipart is empty')
 
-            async for value in self.add_generic(mpwriter, params=params):
-                yield value
+            try:
+                async for value in self.add_generic(mpwriter, params=params):
+                    yield value
+            except Exception as err:
+                for fd in descriptors:
+                    try:
+                        fd.close()
+                    except Exception:
+                        continue
+
+                raise err
 
     async def commands(self):
         """ List all available commands."""
@@ -1719,6 +1738,26 @@ class CoreAPI(SubAPI):
             ARG_PARAM: path
         }
         return await self.fetch_json(self.url('ls'), params=params)
+
+    async def ls_streamed(self, path, headers=False, resolve_type=True):
+        """
+        List directory contents for Unix filesystem objects (streamed)
+
+        :param str path: The path to the IPFS object(s) to list links from
+        :param bool headers: Print table headers (Hash, Size, Name)
+        :param bool resolve_type: Resolve linked objects to get their types
+        """
+
+        params = {
+            'resolve-type': boolarg(resolve_type),
+            'headers': boolarg(headers),
+            'stream': boolarg(True),
+            ARG_PARAM: path
+        }
+
+        async for value in self.mjson_decode(
+                self.url('ls'), params=params):
+            yield value
 
     async def mount(self, ipfspath, ipnspath):
         params = {
