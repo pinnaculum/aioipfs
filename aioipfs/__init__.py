@@ -1,4 +1,4 @@
-__version__ = '0.4.8'
+__version__ = '0.4.9'
 
 from yarl import URL
 from distutils.version import StrictVersion
@@ -71,6 +71,7 @@ class AsyncIPFS(object):
         self.dag = api.DagAPI(self)
         self.dht = api.DhtAPI(self)
         self.diag = api.DiagAPI(self)
+        self.file = api.FileAPI(self)
         self.files = api.FilesAPI(self)
         self.filestore = api.FilestoreAPI(self)
         self.key = api.KeyAPI(self)

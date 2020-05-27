@@ -763,6 +763,12 @@ class DiagAPI(SubAPI):
         return await self.fetch_text(self.url('diag/cmds/clear'))
 
 
+class FileAPI(SubAPI):
+    async def ls(self, path):
+        params = {ARG_PARAM: path}
+        return await self.fetch_json(self.url('file/ls'), params=params)
+
+
 class FilesAPI(SubAPI):
     async def cp(self, source, dest):
         params = quote_args(source, dest)
@@ -771,7 +777,7 @@ class FilesAPI(SubAPI):
 
     async def chcid(self, path, cidversion):
         params = {ARG_PARAM: path, 'cid-version': str(cidversion)}
-        return await self.fetch_text(self.url('files/cp'), params=params)
+        return await self.fetch_text(self.url('files/chcid'), params=params)
 
     async def flush(self, path):
         params = {ARG_PARAM: path}
@@ -1104,6 +1110,18 @@ class ObjectAPI(SubAPI):
     async def stat(self, objkey):
         params = {ARG_PARAM: objkey}
         return await self.fetch_json(self.url('object/stat'), params=params)
+
+    async def diff(self, obja, objb, verbose=False):
+        """
+        Display the diff between two ipfs objects.
+        """
+
+        params = quote_dict({
+            ARG_PARAM: [obja, objb],
+            'verbose': boolarg(verbose)
+        })
+
+        return await self.fetch_json(self.url('object/diff'), params=params)
 
     async def get(self, objkey):
         params = {ARG_PARAM: objkey}
@@ -1796,6 +1814,12 @@ class CoreAPI(SubAPI):
         }
 
         return await self.fetch_json(self.url('version'), params=params)
+
+    async def version_deps(self):
+        """
+        Shows information about dependencies used for build
+        """
+        return await self.fetch_json(self.url('version/deps'))
 
     async def dns(self, name, recursive=False):
         """

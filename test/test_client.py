@@ -138,7 +138,7 @@ class TestAsyncIPFS:
     async def test_basic(self, event_loop, ipfsdaemon, iclient):
         tmpdir, sp = ipfsdaemon
         await iclient.id()
-        await iclient.version()
+        await iclient.core.version()
         await iclient.commands()
         await iclient.close()
 
@@ -452,6 +452,9 @@ class TestAsyncIPFS:
                                                  obj1Ent['Hash'])
         r2 = await iclient.object.patch.add_link(r1['Hash'], 'obj2',
                                                  obj2Ent['Hash'])
+        diff = await iclient.object.diff(r2['Hash'], obj['Hash'], verbose=True)
+        assert 'Changes' in diff
+        assert len(diff['Changes']) == 2
 
         dag = await iclient.object.get(r2['Hash'])
         assert len(dag['Links']) == 2
