@@ -1318,8 +1318,10 @@ class RepoAPI(SubAPI):
             'quiet': boolarg(quiet),
             'stream-errors': boolarg(streamerrors)
         }
-        return await self.fetch_text(self.url('repo/gc'),
-                                     params=params)
+
+        async for ent in self.mjson_decode(self.url('repo/gc'),
+                                           params=params):
+            yield ent
 
     async def verify(self):
         return await self.fetch_json(self.url('repo/verify'))
