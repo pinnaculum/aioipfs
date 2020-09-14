@@ -1743,6 +1743,94 @@ class CoreAPI(SubAPI):
         tar_future = loop.run_in_executor(None, extract)
         return await tar_future
 
+    async def getgen(self, objpath, dstdir='.', compress=False,
+                     compression_level=-1, archive=True, output=None,
+                     progress_callback=None, progress_callback_arg=None,
+                     sleept=0.05, chunk_size=16384):
+        """
+        Download IPFS objects.
+
+        :param str objpath: The base58 objpath of the object to retrieve
+        :param str dstdir: destination directory, current directory by default
+        :param bool compress: Compress the output with GZIP compression
+        :param str compression_level: The level of compression (1-9)
+        :param bool archive: Output a TAR archive
+        """
+
+        params = {
+            ARG_PARAM: objpath,
+            'compress': boolarg(compress),
+            'compression-level': str(compression_level),
+            'archive': boolarg(archive)
+        }
+
+        if isinstance(output, str):
+            params['output'] = output
+
+        archive_path = tempfile.mkstemp(prefix='aioipfs')[1]
+
+        # We read chunk by chunk the tar data coming from the
+        # daemon and use aiofiles to asynchronously write the data to
+        # the temporary file
+
+        read_so_far = 0
+        chunks = 0
+
+        try:
+            async with aiofiles.open(archive_path, 'wb') as fd:
+                async with self.driver.session.post(self.url('get'),
+                                                    params=params) as response:
+                    if response.status != 200:
+                        raise aioipfs.APIError(http_status=response.status)
+
+                    headers = response.headers
+                    clength = int(headers.get('X-Content-Length'))
+
+                    while True:
+                        chunk = await response.content.read(chunk_size)
+                        if not chunk:
+                            break
+
+                        chunks += 1
+                        read_so_far += len(chunk)
+
+                        yield 0, read_so_far, clength
+
+                        await fd.write(chunk)
+                        await asyncio.sleep(sleept)
+
+                    await response.release()
+        except GeneratorExit:
+            os.unlink(archive_path)
+            raise
+        except Exception:
+            os.unlink(archive_path)
+            raise
+        else:
+            def extract():
+                # Synchronous tar extraction runs in the executor
+                mode = 'r|gz' if compress is True else 'r|'
+                try:
+                    with tarfile.open(name=archive_path, mode=mode) as tf:
+                        tf.extractall(path=dstdir)
+                    os.unlink(archive_path)
+                    return True
+                except Exception as e:
+                    print(
+                        'Could not extract TAR file:', str(e), file=sys.stderr)
+                    os.unlink(archive_path)
+                    return False
+
+            # Run the tar extraction inside asyncio's threadpool
+            loop = asyncio.get_event_loop()
+            tar_future = loop.run_in_executor(None, extract)
+            res = await tar_future
+
+            if res is True:
+                yield 1, None, None
+            else:
+                yield -1, None, None
+
     async def ls(self, path, headers=False, resolve_type=True):
         """
         List directory contents for Unix filesystem objects.
