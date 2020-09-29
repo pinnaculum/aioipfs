@@ -645,6 +645,22 @@ class DagAPI(SubAPI):
         return await self.fetch_text(self.url('dag/get'),
                                      params={ARG_PARAM: objpath})
 
+    async def stat(self, cid, progress=True):
+        """
+        Gets stats for a DAG
+
+        :param str cid: CID of a DAG root to get statistics for
+        """
+
+        params = {
+            ARG_PARAM: cid,
+            'progress': boolarg(progress)
+        }
+
+        async for value in self.mjson_decode(self.url('dag/stat'),
+                                             params=params):
+            yield value
+
     async def car_import(self, car, silent=False, pin_roots=True):
         """
         Import the contents of .car files
@@ -1241,11 +1257,17 @@ class PubSubAPI(SubAPI):
         """
         return await self.fetch_json(self.url('pubsub/ls'))
 
-    async def peers(self):
+    async def peers(self, topic=None):
         """
         List peers communicating over pubsub with this node.
         """
-        return await self.fetch_json(self.url('pubsub/peers'))
+
+        params = {}
+        if isinstance(topic, str):
+            params[ARG_PARAM] = topic
+
+        return await self.fetch_json(
+            self.url('pubsub/peers'), params=params)
 
     async def pub(self, topic, data):
         """
