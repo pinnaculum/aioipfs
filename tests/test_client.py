@@ -342,6 +342,12 @@ class TestAsyncIPFS:
         # Get them all back concurrently
         tasks = [iclient.get(hash, dstdir=tmpdir) for hash in hashes]
         await asyncio.gather(*tasks)
+
+        for hash in hashes:
+            async for result in iclient.getgen(hash, dstdir=tmpdir):
+                status, read, clength = result
+                assert status in [0, 1]
+
         await iclient.close()
 
     @pytest.mark.asyncio

@@ -1,4 +1,4 @@
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 
 from yarl import URL
 from distutils.version import StrictVersion
@@ -118,6 +118,10 @@ class AsyncIPFS(object):
     @property
     def get(self):
         return self.core.get
+
+    @property
+    def getgen(self):
+        return self.core.getgen
 
     @property
     def id(self):

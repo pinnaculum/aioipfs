@@ -1693,6 +1693,28 @@ class CoreAPI(SubAPI):
 
         return await self.fetch_raw(self.url('cat'), params=params)
 
+    def _extract_tar(self, archive_path: str, dstdir: str, compress: bool):
+        # Synchronous tar extraction runs in the executor
+
+        mode = 'r|gz' if compress is True else 'r|'
+
+        def remove_archive():
+            try:
+                os.unlink(archive_path)
+            except Exception as err:
+                print('Could not remove TAR file:', str(err), file=sys.stderr)
+
+        try:
+            with tarfile.open(name=archive_path, mode=mode) as tf:
+                tf.extractall(path=dstdir)
+        except Exception as err:
+            print('Could not extract TAR file:', str(err), file=sys.stderr)
+            remove_archive()
+            return False
+        else:
+            remove_archive()
+            return True
+
     async def get(self, multihash, dstdir='.', compress=False,
                   compression_level=-1, archive=True, output=None,
                   progress_callback=None, progress_callback_arg=None,
@@ -1746,23 +1768,11 @@ class CoreAPI(SubAPI):
 
                 await response.release()
 
-        def extract():
-            # Synchronous tar extraction runs in the executor
-            mode = 'r|gz' if compress is True else 'r|'
-            try:
-                with tarfile.open(name=archive_path, mode=mode) as tf:
-                    tf.extractall(path=dstdir)
-                os.unlink(archive_path)
-            except Exception as e:
-                print('Could not extract TAR file:', str(e), file=sys.stderr)
-                os.unlink(archive_path)
-                return False
-
-            return True
-
         # Run the tar extraction inside asyncio's threadpool
         loop = asyncio.get_event_loop()
-        tar_future = loop.run_in_executor(None, extract)
+        tar_future = loop.run_in_executor(
+            None, self._extract_tar,
+            archive_path, dstdir, compress)
         return await tar_future
 
     async def getgen(self, objpath, dstdir='.', compress=False,
@@ -1829,23 +1839,11 @@ class CoreAPI(SubAPI):
             os.unlink(archive_path)
             raise
         else:
-            def extract():
-                # Synchronous tar extraction runs in the executor
-                mode = 'r|gz' if compress is True else 'r|'
-                try:
-                    with tarfile.open(name=archive_path, mode=mode) as tf:
-                        tf.extractall(path=dstdir)
-                    os.unlink(archive_path)
-                    return True
-                except Exception as e:
-                    print(
-                        'Could not extract TAR file:', str(e), file=sys.stderr)
-                    os.unlink(archive_path)
-                    return False
-
             # Run the tar extraction inside asyncio's threadpool
             loop = asyncio.get_event_loop()
-            tar_future = loop.run_in_executor(None, extract)
+            tar_future = loop.run_in_executor(
+                None, self._extract_tar,
+                archive_path, dstdir, compress)
             res = await tar_future
 
             if res is True:

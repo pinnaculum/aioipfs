@@ -1,5 +1,6 @@
 import os
 import os.path
+import posixpath
 import io
 import re
 
@@ -183,6 +184,10 @@ class DirectoryListing:
                 # Create an empty, fake file to represent the directory
                 mock_file = io.StringIO()
                 mock_file.write(u'')
+
+                # posix-ify
+                dir_base = dir_base.replace(os.sep, posixpath.sep)
+
                 # Add this directory to those that will be sent
                 names.append(('files',
                               (dir_base,
@@ -202,6 +207,9 @@ class DirectoryListing:
                 if short_unr and self.ignrules and self.ignrules(short_unr):
                     # Matches ignore rules
                     return
+
+                # posix-ify
+                short_path = short_path.replace(os.sep, posixpath.sep)
 
                 # Always add files in wildcard directories
                 names.append(('files', (short_path,
