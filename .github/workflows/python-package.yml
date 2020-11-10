@@ -18,7 +18,7 @@ jobs:
     - name: extract
       run: |
         tar -xzvf go-ipfs_v0.7.0_linux-amd64.tar.gz
-        mv go-ipfs/ipfs .
+        echo "go-ipfs" >> $GITHUB_PATH
 
   build:
 
