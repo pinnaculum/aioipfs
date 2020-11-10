@@ -1,30 +1,17 @@
-name: Python package
+name: aioipfs-build
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, ci ]
   pull_request:
     branches: [ master ]
 
 jobs:
-  wget:
-    runs-on: ubuntu-latest
-    steps:
-    - name: wget
-      uses: wei/wget@v1
-      with:
-        args: -O go-ipfs_v0.7.0_linux-amd64.tar.gz https://dist.ipfs.io/go-ipfs/v0.7.0/go-ipfs_v0.7.0_linux-amd64.tar.gz
-
-    - name: extract
-      run: |
-        tar -xzvf go-ipfs_v0.7.0_linux-amd64.tar.gz
-
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.6, 3.7, 3.8, 3.9]
 
     steps:
     - uses: actions/checkout@v2
@@ -37,12 +24,19 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: setup paths
-      run: |
-        echo "go-ipfs" >> $GITHUB_PATH
     - name: Lint with flake8
       run: |
         flake8 aioipfs tests --count --select=E9,F63,F7,F82 --show-source --statistics
+    - name: wget
+      uses: wei/wget@v1
+      with:
+        args: -O go-ipfs_v0.7.0_linux-amd64.tar.gz https://dist.ipfs.io/go-ipfs/v0.7.0/go-ipfs_v0.7.0_linux-amd64.tar.gz
+
+    - name: extract
+      run: |
+        tar -C $GITHUB_WORKSPACE -xzvf go-ipfs_v0.7.0_linux-amd64.tar.gz
+        echo "${GITHUB_WORKSPACE}/go-ipfs" >> $GITHUB_PATH
+
     - name: Test with pytest
       run: |
         pytest -v -s tests

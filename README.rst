@@ -6,6 +6,10 @@ aioipfs
 
 **aioipfs** is a python3 library providing an asynchronous API for IPFS_
 
+
+.. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
+    :target: https://github.com/pinnaculum/aioipfs
+
 Installation
 ============
 
