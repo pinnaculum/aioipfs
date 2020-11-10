@@ -38,6 +38,7 @@ jobs:
         if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: setup paths
+      run: |
         echo "go-ipfs" >> $GITHUB_PATH
     - name: Lint with flake8
       run: |
