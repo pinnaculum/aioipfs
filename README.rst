@@ -4,8 +4,8 @@ aioipfs
 
 :info: Asynchronous IPFS_ client library
 
-**aioipfs** is a python3 library providing an asynchronous API for IPFS_
-
+**aioipfs** is a python3 library providing an asynchronous API for IPFS_.
+Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*
 
 .. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
     :target: https://github.com/pinnaculum/aioipfs
@@ -90,7 +90,7 @@ event loop. TAR extraction is done in asyncio's threadpool.
 Requirements
 ============
 
-- Python >= 3.6
+- Python >= 3.6, <= 3.9
 - aiohttp_
 - aiofiles_
 - yarl_
@@ -98,7 +98,6 @@ Requirements
 .. _aiohttp: https://pypi.python.org/pypi/aiohttp
 .. _aiofiles: https://pypi.python.org/pypi/aiofiles
 .. _yarl: https://pypi.python.org/pypi/yarl
-.. _async-generator: https://pypi.python.org/pypi/async_generator
 .. _IPFS: https://ipfs.io
 
 License
