@@ -1,4 +1,5 @@
 import json
+import orjson
 import os.path
 import tarfile
 import tempfile
@@ -62,7 +63,7 @@ def decode_json(data):
     if not data:
         return None
     try:
-        json_obj = json.loads(data.decode())
+        json_obj = orjson.loads(data.decode())
     except Exception as exc:
         print(data, file=sys.stderr)
         print('Could not read JSON object:', str(exc), file=sys.stderr)
