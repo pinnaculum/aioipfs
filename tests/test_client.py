@@ -501,3 +501,46 @@ class TestAsyncIPFS:
         await iclient.cid.bases()
         await iclient.cid.hashes()
         await iclient.close()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('srvname', ['mysrv1'])
+    @pytest.mark.parametrize('srvendpoint', ['http://localhost:9580'])
+    async def test_pin_remote(self, event_loop, ipfsdaemon, iclient,
+                              srvname, srvendpoint):
+        res = await iclient.pin.remote.service.add(
+            srvname,
+            srvendpoint,
+            'mykey'
+        )
+
+        res = await iclient.pin.remote.service.ls()
+        assert 'RemoteServices' in res
+        service = res['RemoteServices'].pop()
+        assert service['Service'] == srvname
+        assert service['ApiEndpoint'] == srvendpoint
+
+        entry = await iclient.core.add_bytes(b'ABCD')
+
+        # Try a remote pin (will fail, service does not exist)
+        try:
+            res = await iclient.pin.remote.add(
+                srvname,
+                f'/ipfs/{entry["Hash"]}'
+            )
+        except aioipfs.APIError as e:
+            print(e.message)
+            # assert 'from remote pinning service' in e.message
+
+        try:
+            res = await iclient.pin.remote.ls(
+                srvname,
+                status=['queued']
+            )
+        except aioipfs.APIError as e:
+            print(e.message)
+
+        await iclient.pin.remote.service.rm(srvname)
+        res = await iclient.pin.remote.service.ls()
+        assert len(res['RemoteServices']) == 0
+
+        await iclient.close()

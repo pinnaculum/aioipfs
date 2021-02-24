@@ -1,4 +1,4 @@
-__version__ = '0.5.3'
+__version__ = '0.5.4'
 
 from yarl import URL
 from distutils.version import StrictVersion
@@ -8,24 +8,8 @@ import aiohttp
 import re
 
 from aioipfs import api
-
-
-class APIError(Exception):
-    """
-    IPFS API error
-
-    :param int code: IPFS error code
-    :param str message: Error message
-    """
-
-    def __init__(self, code=-1, message='', http_status=-1):
-        self.code = code
-        self.message = message
-        self.http_status = http_status
-
-
-class UnknownAPIError(APIError):
-    pass
+from aioipfs.exceptions import *  # noqa
+from aioipfs.apis import pin as pin_api
 
 
 class AsyncIPFS(object):
@@ -75,7 +59,7 @@ class AsyncIPFS(object):
         self.files = api.FilesAPI(self)
         self.filestore = api.FilestoreAPI(self)
         self.key = api.KeyAPI(self)
-        self.pin = api.PinAPI(self)
+        self.pin = pin_api.PinAPI(self)
         self.log = api.LogAPI(self)
         self.name = api.NameAPI(self)
         self.object = api.ObjectAPI(self)
