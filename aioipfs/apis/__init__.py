@@ -4,6 +4,7 @@ import asyncio
 from aiohttp.web_exceptions import (HTTPError,
                                     HTTPInternalServerError,
                                     HTTPServerError, HTTPBadRequest)
+from aiohttp.client_exceptions import *  # noqa
 
 from aioipfs.helpers import *  # noqa
 from aioipfs.exceptions import *  # noqa
@@ -60,35 +61,40 @@ class SubAPI(object):
             return data
 
     async def fetch_json(self, url, params={}, timeout=DEFAULT_TIMEOUT):
-        async with self.driver.session.post(url, params=params) as response:
-            status, jsondata = response.status, await response.json()
-            if status in HTTP_ERROR_CODES:
-                if 'Message' in jsondata and 'Code' in jsondata:
-                    raise APIError(
-                        code=jsondata['Code'],
-                        message=jsondata['Message'],
-                        http_status=status)
+        return await self.post(url, params=params, outformat='json')
+
+    async def post(self, url, data=None, headers={}, params={},
+                   outformat='text'):
+        try:
+            async with self.driver.session.post(url, data=data,
+                                                headers=headers,
+                                                params=params) as response:
+                if response.status in HTTP_ERROR_CODES:
+                    msg, code = self.decode_error(
+                        await response.read()
+                    )
+
+                    if msg and code:
+                        raise APIError(code=code,
+                                       message=msg,
+                                       http_status=response.status)
+                    else:
+                        raise UnknownAPIError()
+
+                if outformat == 'text':
+                    return await response.text()
+                elif outformat == 'json':
+                    return await response.json()
+                elif outformat == 'raw':
+                    return await response.read()
                 else:
-                    raise UnknownAPIError()
-
-            return jsondata
-
-    async def post(self, url, data, headers={}, params={},
-                   timeout=DEFAULT_TIMEOUT, outformat='text'):
-        async with self.driver.session.post(url, data=data,
-                                            headers=headers,
-                                            params=params) as response:
-            if response.status in HTTP_ERROR_CODES:
-                errtext = await response.read()
-                raise APIError(message=errtext,
-                               http_status=response.status)
-
-            if outformat == 'text':
-                return await response.text()
-            elif outformat == 'json':
-                return await response.json()
-            else:
-                raise Exception('Unknown output format {0}'.format(outformat))
+                    raise Exception(
+                        f'Unknown output format {outformat}')
+        except (ClientPayloadError,
+                ClientConnectorError,
+                ServerDisconnectedError,
+                BaseException):
+            return None
 
     async def mjson_decode(self, url, method='post', data=None,
                            params=None, headers=None,
@@ -143,6 +149,11 @@ class SubAPI(object):
                 await session.close()
 
             raise err
+        except (ClientPayloadError,
+                ClientConnectorError,
+                ServerDisconnectedError,
+                Exception):
+            pass
 
         if new_session is True:
             await session.close()
