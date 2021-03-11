@@ -505,7 +505,7 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('srvname', ['mysrv1'])
     @pytest.mark.parametrize('srvendpoint', ['http://localhost:9580'])
-    async def test_pin_remote(self, event_loop, ipfsdaemon, iclient,
+    async def _no_test_pin_remote(self, event_loop, ipfsdaemon, iclient,
                               srvname, srvendpoint):
         res = await iclient.pin.remote.service.add(
             srvname,
@@ -527,9 +527,8 @@ class TestAsyncIPFS:
                 srvname,
                 f'/ipfs/{entry["Hash"]}'
             )
-        except aioipfs.APIError as e:
-            print(e.message)
-            # assert 'from remote pinning service' in e.message
+        except aioipfs.APIError:
+            pass
 
         try:
             async for entry in iclient.pin.remote.ls(
