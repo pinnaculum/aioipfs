@@ -5,6 +5,7 @@ import sys
 import codecs
 
 from setuptools import setup
+from setuptools import find_packages
 
 PY_VER = sys.version_info
 
@@ -36,7 +37,7 @@ setup(
     url='https://gitlab.com/cipres/aioipfs',
     description='Asynchronous IPFS client library',
     long_description=long_description,
-    packages=['aioipfs'],
+    packages=find_packages(),
     include_package_data=False,
     install_requires=install_reqs,
     classifiers=[
