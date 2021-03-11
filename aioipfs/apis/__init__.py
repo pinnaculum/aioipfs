@@ -1,5 +1,6 @@
 import json
 import asyncio
+import sys
 
 from aiohttp.web_exceptions import (HTTPError,
                                     HTTPInternalServerError,
@@ -90,10 +91,20 @@ class SubAPI(object):
                 else:
                     raise Exception(
                         f'Unknown output format {outformat}')
+        except (APIError, UnknownAPIError) as apierr:
+            if self.driver.debug:
+                print(f'{url}: Post API error: {apierr}',
+                      file=sys.stderr)
+
+            raise apierr
         except (ClientPayloadError,
                 ClientConnectorError,
                 ServerDisconnectedError,
-                BaseException):
+                BaseException) as err:
+            if self.driver.debug:
+                print(f'{url}: aiohttp error: {err}',
+                      file=sys.stderr)
+
             return None
 
     async def mjson_decode(self, url, method='post', data=None,
@@ -110,7 +121,7 @@ class SubAPI(object):
         :param params: http params
         """
 
-        kwargs = {'params': params if isinstance(params, dict) else {}}
+        kwargs = {'params': params if params else {}}
 
         if new_session is True:
             session = self.driver.get_session(
@@ -149,11 +160,13 @@ class SubAPI(object):
                 await session.close()
 
             raise err
+        except APIError as e:
+            raise e
         except (ClientPayloadError,
                 ClientConnectorError,
                 ServerDisconnectedError,
                 Exception):
-            pass
+            raise IPFSConnectionError('Connection/payload error')
 
         if new_session is True:
             await session.close()

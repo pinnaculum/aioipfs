@@ -532,10 +532,11 @@ class TestAsyncIPFS:
             # assert 'from remote pinning service' in e.message
 
         try:
-            res = await iclient.pin.remote.ls(
+            async for entry in iclient.pin.remote.ls(
                 srvname,
                 status=['queued']
-            )
+            ):
+                print(entry)
         except aioipfs.APIError as e:
             print(e.message)
 

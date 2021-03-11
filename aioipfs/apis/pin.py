@@ -52,17 +52,19 @@ class PinRemoteAPI(SubAPI):
                  status: list = ['pinned']):
         params = {
             'service': service,
-            'status': ','.join(status)
+            'status': status
         }
 
         if len(cid) > 0:
-            params['cid'] = ','.join(cid)
+            params['cid'] = cid
 
         if isinstance(name, str):
             params['name'] = name
 
-        return await self.fetch_json(self.url('pin/remote/ls'),
-                                     params=params)
+        async for entry in self.mjson_decode(
+                self.url('pin/remote/ls'),
+                params=quote_dict(params)):
+            yield entry
 
     async def rm(self, service: str,
                  name=None,
@@ -71,18 +73,18 @@ class PinRemoteAPI(SubAPI):
                  force=False):
         params = {
             'service': service,
-            'status': ','.join(status),
+            'status': status,
             'force': boolarg(force)
         }
 
         if len(cid) > 0:
-            params['cid'] = ','.join(cid)
+            params['cid'] = cid
 
         if isinstance(name, str):
             params['name'] = name
 
         return await self.fetch_json(self.url('pin/remote/rm'),
-                                     params=params)
+                                     params=quote_dict(params))
 
 
 class PinAPI(SubAPI):

@@ -1,3 +1,7 @@
+class IPFSConnectionError(Exception):
+    pass
+
+
 class APIError(Exception):
     """
     IPFS API error

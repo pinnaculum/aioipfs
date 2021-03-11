@@ -27,13 +27,15 @@ class AsyncIPFS(object):
 
     def __init__(self, host='localhost', port=5001, loop=None,
                  conns_max=0, conns_max_per_host=0,
-                 read_timeout=0, api_version='v0'):
+                 read_timeout=0, api_version='v0',
+                 debug=False):
 
         self._conns_max = conns_max
         self._conns_max_per_host = conns_max_per_host
         self._read_timeout = read_timeout
         self._host = host
         self._port = port
+        self._debug = debug
 
         self.loop = loop if loop else asyncio.get_event_loop()
 
@@ -70,6 +72,10 @@ class AsyncIPFS(object):
         self.stats = api.StatsAPI(self)
 
         self._agent_version = None
+
+    @property
+    def debug(self):
+        return self._debug
 
     @property
     def agent_version(self):
