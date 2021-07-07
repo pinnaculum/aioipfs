@@ -10,6 +10,8 @@ Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*
 .. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
     :target: https://github.com/pinnaculum/aioipfs
 
+.. image:: https://gitlab.com/cipres/aioipfs/badges/master/pipeline.svg
+
 Installation
 ============
 
