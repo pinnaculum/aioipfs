@@ -1,4 +1,4 @@
-__version__ = '0.5.5'
+__version__ = '0.5.6'
 
 from yarl import URL
 from distutils.version import StrictVersion
@@ -9,7 +9,10 @@ import re
 
 from aioipfs import api
 from aioipfs.exceptions import *  # noqa
+from aioipfs.apis import dag as dag_api
 from aioipfs.apis import pin as pin_api
+from aioipfs.apis import multibase as multibase_api
+from aioipfs.apis import pubsub as pubsub_api
 
 
 class AsyncIPFS(object):
@@ -49,12 +52,12 @@ class AsyncIPFS(object):
         self.core = api.CoreAPI(self)
         self.p2p = api.P2PAPI(self)
         self.block = api.BlockAPI(self)
-        self.pubsub = api.PubSubAPI(self)
+        self.pubsub = pubsub_api.PubSubAPI(self)
         self.bitswap = api.BitswapAPI(self)
         self.bootstrap = api.BootstrapAPI(self)
         self.cid = api.CidAPI(self)
         self.config = api.ConfigAPI(self)
-        self.dag = api.DagAPI(self)
+        self.dag = dag_api.DagAPI(self)
         self.dht = api.DhtAPI(self)
         self.diag = api.DiagAPI(self)
         self.file = api.FileAPI(self)
@@ -63,10 +66,12 @@ class AsyncIPFS(object):
         self.key = api.KeyAPI(self)
         self.pin = pin_api.PinAPI(self)
         self.log = api.LogAPI(self)
+        self.multibase = multibase_api.MultibaseAPI(self)
         self.name = api.NameAPI(self)
         self.object = api.ObjectAPI(self)
         self.refs = api.RefsAPI(self)
         self.repo = api.RepoAPI(self)
+        self.routing = api.RoutingAPI(self)
         self.swarm = api.SwarmAPI(self)
         self.tar = api.TarAPI(self)
         self.stats = api.StatsAPI(self)

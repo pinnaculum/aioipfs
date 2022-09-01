@@ -37,9 +37,7 @@ class SubAPI(object):
     def decode_error(self, errormsg):
         try:
             decoded_json = json.loads(errormsg)
-            msg = decoded_json['Message']
-            code = decoded_json['Code']
-            return msg, code
+            return decoded_json['Message'], decoded_json['Code']
         except Exception:
             return None, None
 

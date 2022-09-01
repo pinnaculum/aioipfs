@@ -7,6 +7,8 @@ aioipfs
 **aioipfs** is a python3 library providing an asynchronous API for IPFS_.
 Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*
 
+It supports the HTTP RPC API specifications for kubo_ version *0.15.0*.
+
 .. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
     :target: https://github.com/pinnaculum/aioipfs
 
@@ -95,12 +97,15 @@ Requirements
 - Python >= 3.6, <= 3.9
 - aiohttp_
 - aiofiles_
+- py-multibase_
 - yarl_
 
 .. _aiohttp: https://pypi.python.org/pypi/aiohttp
 .. _aiofiles: https://pypi.python.org/pypi/aiofiles
+.. _py-multibase: https://pypi.python.org/pypi/py-multibase
 .. _yarl: https://pypi.python.org/pypi/yarl
 .. _IPFS: https://ipfs.io
+.. _kubo: https://github.com/ipfs/kubo
 
 License
 =======

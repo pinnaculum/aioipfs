@@ -2,7 +2,7 @@ name: aioipfs-build
 
 on:
   push:
-    branches: [ master, devel, ci ]
+    branches: [ master, devel, ci, kubo ]
   pull_request:
     branches: [ master ]
 
@@ -31,12 +31,12 @@ jobs:
     - name: wget
       uses: wei/wget@v1
       with:
-        args: -O go-ipfs_v0.7.0_linux-amd64.tar.gz https://dist.ipfs.io/go-ipfs/v0.7.0/go-ipfs_v0.7.0_linux-amd64.tar.gz
+        args: -O kubo_v0.15.0_linux-amd64.tar.gz https://dist.ipfs.tech/kubo/v0.15.0/kubo_v0.15.0_linux-amd64.tar.gz
 
     - name: extract
       run: |
-        tar -C $GITHUB_WORKSPACE -xzvf go-ipfs_v0.7.0_linux-amd64.tar.gz
-        echo "${GITHUB_WORKSPACE}/go-ipfs" >> $GITHUB_PATH
+        tar -C $GITHUB_WORKSPACE -xzvf kubo_v0.15.0_linux-amd64.tar.gz
+        echo "${GITHUB_WORKSPACE}/kubo" >> $GITHUB_PATH
 
     - name: Test with pytest
       run: |
@@ -64,11 +64,7 @@ jobs:
         python setup.py sdist bdist_wheel
 
     - name: Upload to PyPI
-      if:
-        contains('
-          refs/heads/master
-          refs/tags/v
-        ', github.ref)
+      if: contains(toJson(github.event.commits), '[pypi-deploy]') == true
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

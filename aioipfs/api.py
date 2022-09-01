@@ -2,8 +2,6 @@ import os.path
 import tarfile
 import tempfile
 import sys
-import base58
-import base64
 from pathlib import Path
 
 import asyncio
@@ -26,7 +24,8 @@ class P2PAPI(SubAPI):
     in the affected API calls to maintain compatibility.
     """
     async def listener_open(self, protocol, address,
-                            allow_custom_protocol=False):
+                            allow_custom_protocol=False,
+                            report_peerid=False):
         """
         Open a P2P listener
 
@@ -40,7 +39,8 @@ class P2PAPI(SubAPI):
             url = self.url('p2p/listen')
             params = quote_dict({
                 ARG_PARAM: [protocol, address],
-                'allow-custom-protocol': boolarg(allow_custom_protocol)
+                'allow-custom-protocol': boolarg(allow_custom_protocol),
+                'report-peer-id': boolarg(report_peerid)
             })
         else:
             url = self.url('p2p/listener/open')
@@ -397,141 +397,6 @@ class ConfigAPI(SubAPI):
                                      params=params)
 
 
-class DagAPI(SubAPI):
-    async def put(self, filename, format='cbor', input_enc='json',
-                  pin=False, offline=False):
-        """
-        Add a DAG node to IPFS
-
-        :param str filename: a path to the object to import
-        :param str format: format to use for the object inside IPFS
-        :param str input_enc: object input encoding
-        :param bool pin: pin the object after adding (default is False)
-        :param bool offline: Offline mode (no announce)
-        """
-
-        if not os.path.isfile(filename):
-            raise Exception('dag put: {} file does not exist'.format(filename))
-
-        params = {
-            'format': format,
-            'input-enc': input_enc,
-            'pin': boolarg(pin),
-            'offline': boolarg(offline)
-        }
-
-        basename = os.path.basename(filename)
-        with multi.FormDataWriter() as mpwriter:
-            dag_payload = payload.BytesIOPayload(open(filename, 'rb'))
-            dag_payload.set_content_disposition('form-data',
-                                                filename=basename)
-            mpwriter.append_payload(dag_payload)
-
-            return await self.post(self.url('dag/put'), mpwriter,
-                                   params=params, outformat='json')
-
-    async def car_export(self, cid, progress=False):
-        """
-        Streams the selected DAG as a .car stream on stdout.
-
-        :param str cid: CID of a root to recursively export
-        """
-
-        return await self.fetch_raw(
-            self.url('dag/export'),
-            params={ARG_PARAM: cid, 'progress': boolarg(progress)}
-        )
-
-    async def get(self, objpath):
-        """
-        Get a DAG node from IPFS
-
-        :param str objpath: path of the object to fetch
-        """
-
-        return await self.fetch_text(self.url('dag/get'),
-                                     params={ARG_PARAM: objpath})
-
-    async def stat(self, cid, progress=True):
-        """
-        Gets stats for a DAG
-
-        :param str cid: CID of a DAG root to get statistics for
-        """
-
-        params = {
-            ARG_PARAM: cid,
-            'progress': boolarg(progress)
-        }
-
-        async for value in self.mjson_decode(self.url('dag/stat'),
-                                             params=params):
-            yield value
-
-    async def car_import(self, car, silent=False, pin_roots=True):
-        """
-        Import the contents of .car files
-
-        :param car: path to a .car archive or bytes object
-        :param bool silent: No output
-        :param bool pin_roots: Pin optional roots listed in the
-            .car headers after importing
-        """
-
-        params = {
-            'silent': boolarg(silent),
-            'pin-roots': boolarg(pin_roots)
-        }
-
-        # Build the multipart form for the CAR import
-        with multi.FormDataWriter() as mpwriter:
-            if isinstance(car, str):
-                if not os.path.isfile(car):
-                    raise Exception('CAR file does not exist')
-
-                basename = os.path.basename(car)
-                car_payload = payload.BytesIOPayload(
-                    open(car, 'rb'),
-                    content_type='application/octet-stream'
-                )
-
-                car_payload.set_content_disposition('form-data',
-                                                    name='file',
-                                                    filename=basename)
-            elif isinstance(car, bytes):
-                car_payload = payload.BytesPayload(
-                    car, content_type='application/octet-stream'
-                )
-
-                car_payload.set_content_disposition('form-data',
-                                                    name='file',
-                                                    filename='car')
-            else:
-                raise ValueError(
-                    'Invalid parameter: argument should be '
-                    'a bytes object or a path to a .car archive')
-
-            mpwriter.append_payload(car_payload)
-
-        if mpwriter.size == 0:
-            raise aioipfs.UnknownAPIError('Multipart is empty')
-
-        async with self.driver.session.post(
-            self.url('dag/import'), data=mpwriter,
-                params=params) as response:
-            return await response.json()
-
-    async def resolve(self, path):
-        """
-        Resolve an IPLD block
-
-        :param str path: path to resolve
-        """
-
-        return await self.fetch_json(self.url('dag/resolve'),
-                                     params={ARG_PARAM: path})
-
-
 class DhtAPI(SubAPI):
     async def findpeer(self, peerid, verbose=False):
         return await self.fetch_json(
@@ -736,6 +601,19 @@ class FilestoreAPI(SubAPI):
 
 
 class KeyAPI(SubAPI):
+    async def export(self, name, output=None,
+                     format='libp2p-protobuf-cleartext'):
+        params = {
+            ARG_PARAM: name,
+            'format': format
+        }
+
+        if output:
+            params['output'] = str(output)
+
+        return await self.fetch_json(self.url('key/export'),
+                                     params=params)
+
     async def list(self, long=False):
         params = {'l': boolarg(long)}
         return await self.fetch_json(self.url('key/list'),
@@ -750,9 +628,20 @@ class KeyAPI(SubAPI):
         params = {ARG_PARAM: name}
         return await self.fetch_json(self.url('key/rm'), params=params)
 
-    async def rename(self, src, dst):
+    async def rename(self, src, dst, ipns_base=None):
         params = quote_args(src, dst)
         return await self.fetch_json(self.url('key/rename'), params=params)
+
+    async def rotate(self, old_key=None, key_type=None, size=None):
+        params = {}
+        if old_key:
+            params['old_key'] = old_key
+        if key_type:
+            params['type'] = key_type
+        if size:
+            params['size'] = size
+
+        return await self.fetch_json(self.url('key/rotate'), params=params)
 
 
 class LogAPI(SubAPI):
@@ -985,84 +874,6 @@ class ObjectAPI(SubAPI):
                                    params=params, outformat='json')
 
 
-class PubSubAPI(SubAPI):
-    async def ls(self):
-        """
-        List the names of the subscribed pubsub topics.
-        """
-        return await self.fetch_json(self.url('pubsub/ls'))
-
-    async def peers(self, topic=None):
-        """
-        List peers communicating over pubsub with this node.
-        """
-
-        params = {}
-        if isinstance(topic, str):
-            params[ARG_PARAM] = topic
-
-        return await self.fetch_json(
-            self.url('pubsub/peers'), params=params)
-
-    async def pub(self, topic, data):
-        """
-        Publish a message to a given pubsub topic.
-
-        :param str topic: topic to publish the message to
-        :param str data: message data
-        """
-
-        return await self.post(self.url('pubsub/pub'),
-                               None, params=quote_args(topic, data))
-
-    async def sub(self, topic, discover=True, timeout=None, read_timeout=None):
-        """
-        Subscribe to messages on a given topic.
-
-        This is an async generator yielding messages as they are read on the
-        pubsub topic.
-
-        :param str topic: topic to subscribe to
-        :param bool discover: try to discover other peers subscribed to
-            the same topic
-        """
-
-        params = {ARG_PARAM: topic, 'discover': boolarg(discover),
-                  'stream-channels': boolarg(True)}
-
-        async for message in self.mjson_decode(
-                self.url('pubsub/sub'),
-                method='post',
-                headers={'Connection': 'Close'},
-                new_session=True,
-                timeout=timeout if timeout else 60.0 * 60 * 24 * 8,
-                read_timeout=read_timeout if read_timeout else 0,
-                params=params):
-            try:
-                converted = self.decode_message(message)
-            except Exception:
-                print('Could not decode pubsub message ({0})'.format(topic),
-                      file=sys.stderr)
-            else:
-                yield converted
-
-            await asyncio.sleep(0)
-
-    def decode_message(self, psmsg):
-        """
-        Convert a raw pubsub message (with base64-encoded fields) to a
-        readable form
-        """
-
-        conv_msg = {}
-        conv_msg['from'] = base58.b58encode(
-            base64.b64decode(psmsg['from']))
-        conv_msg['data'] = base64.b64decode(psmsg['data'])
-        conv_msg['seqno'] = base64.b64decode(psmsg['seqno'])
-        conv_msg['topicIDs'] = psmsg['topicIDs']
-        return conv_msg
-
-
 class RefsAPI(SubAPI):
     async def local(self):
         async for ref in self.mjson_decode(self.url('refs/local')):
@@ -1089,6 +900,52 @@ class RepoAPI(SubAPI):
     async def stat(self, human=False):
         return await self.fetch_json(self.url('repo/stat'),
                                      params={'human': boolarg(human)})
+
+
+class RoutingAPI(SubAPI):
+    async def findpeer(self, peerid, verbose=False):
+        return await self.fetch_json(
+            self.url('routing/findpeer'),
+            params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
+        )
+
+    async def findprovs(self, key, verbose=False, numproviders=20):
+        params = {
+            ARG_PARAM: key,
+            'verbose': boolarg(verbose),
+            'num-providers': numproviders
+        }
+
+        async for value in self.mjson_decode(self.url('routing/findprovs'),
+                                             params=params):
+            yield value
+
+    async def get(self, peerid, verbose=False):
+        return await self.fetch_json(
+            self.url('routing/get'),
+            params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
+        )
+
+    async def put(self, key, value):
+        return await self.fetch_json(self.url('routing/put'),
+                                     params=quote_args(key, value))
+
+    async def provide(self, multihash, verbose=False, recursive=False):
+        params = {
+            ARG_PARAM: multihash,
+            'verbose': boolarg(verbose),
+            'recursive': boolarg(recursive)
+        }
+
+        async for value in self.mjson_decode(
+                self.url('routing/provide'), params=params):
+            yield value
+
+    async def query(self, peerid, verbose=False):
+        async for value in self.mjson_decode(
+                self.url('dht/query'),
+                params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}):
+            yield value
 
 
 class StatsAPI(SubAPI):
@@ -1158,6 +1015,26 @@ class SwarmAPI(SubAPI):
         params = {ARG_PARAM: filter}
         return await self.fetch_json(self.url('swarm/filters/rm'),
                                      params=params)
+
+    async def limit(self, filepath, scope: str):
+        """
+        Get or set resource limits for a scope
+        """
+        params = {ARG_PARAM: scope}
+
+        with multi.FormDataWriter() as mpwriter:
+            mpwriter.append_payload(multi.bytes_payload_from_file(filepath))
+
+            return await self.post(self.url('swarm/limit'), mpwriter,
+                                   params=params, outformat='json')
+
+    async def stats(self, scope: str):
+        """
+        Report resource usage for a scope
+        """
+
+        return await self.fetch_json(self.url('swarm/stats'),
+                                     params={ARG_PARAM: scope})
 
 
 class TarAPI(SubAPI):

@@ -112,7 +112,7 @@ def ipfsdaemon():
     ipfs_config_json('Experimental.FilestoreEnabled', 'true')
 
     # Run the daemon and wait a bit
-    sp = subprocess.Popen(['ipfs', 'daemon'],
+    sp = subprocess.Popen(['ipfs', 'daemon', '--enable-pubsub-experiment'],
                           stdout=subprocess.PIPE)
     time.sleep(1)
 
@@ -351,12 +351,70 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
-    async def test_pubsub(self, event_loop, ipfsdaemon, iclient):
-        # because we don't have pubsub enabled in the daemon with
-        # --enable-pubsub-experiment this should raise an exception
-        with pytest.raises(aioipfs.APIError):
-            await iclient.pubsub.ls()
-            await iclient.pubsub.peers()
+    async def test_multibase(self, event_loop, ipfsdaemon, iclient,
+                             tmpdir, testfile1):
+        reply = await iclient.multibase.list()
+        assert isinstance(reply, list)
+        assert len(reply) > 0
+
+        reply = await iclient.multibase.encode(str(testfile1))
+        encp = tmpdir.join('encoded')
+        encp.write(reply)
+        assert reply == 'uUE9JRUtKRE9PT1BJRE1XT1BJTVBPV0UoKT1kczEyOTA4NGJqY3k'
+
+        reply = await iclient.multibase.decode(str(encp))
+        assert isinstance(reply, str)
+        reply = await iclient.multibase.transcode(str(encp))
+        assert isinstance(reply, str)
+
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('topic', ['aioipfs.pytest'])
+    @pytest.mark.parametrize('msgdata', ['test'])
+    async def test_pubsub(self, event_loop, ipfsdaemon, iclient,
+                          topic, msgdata):
+        # Listen on a pubsub topic and send a single message, checking that
+        # the multibase decoding is correctly done
+
+        info = await iclient.id()
+
+        await iclient.pubsub.ls()
+        await iclient.pubsub.peers()
+
+        async def subtask():
+            try:
+                async for message in iclient.pubsub.sub(topic):
+                    assert message['from'] == info['ID']
+                    assert message['topicIDs'] == [topic]
+                    assert message['data'].decode() == msgdata
+            except AssertionError as err:
+                print(f'Pubsub message assert error: {err}')
+                return False
+            except asyncio.CancelledError:
+                return True
+
+            return False
+
+        t = asyncio.ensure_future(subtask())
+
+        await asyncio.sleep(2)
+        await iclient.pubsub.pub(topic, msgdata)
+        await asyncio.sleep(1)
+
+        t.cancel()
+        await asyncio.sleep(0.5)
+        assert t.result() is True
+
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_routing(self, event_loop, ipfsdaemon, iclient):
+        reply = await iclient.add_bytes(b'ABCD', cid_version=1,
+                                        hash='sha2-256')
+        provs = [p async for p in iclient.routing.findprovs(reply['Hash'])]
+        assert len(provs) > 0
+
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -506,7 +564,7 @@ class TestAsyncIPFS:
     @pytest.mark.parametrize('srvname', ['mysrv1'])
     @pytest.mark.parametrize('srvendpoint', ['http://localhost:9580'])
     async def _no_test_pin_remote(self, event_loop, ipfsdaemon, iclient,
-                              srvname, srvendpoint):
+                                  srvname, srvendpoint):
         res = await iclient.pin.remote.service.add(
             srvname,
             srvendpoint,
