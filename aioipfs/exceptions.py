@@ -16,5 +16,17 @@ class APIError(Exception):
         self.http_status = http_status
 
 
+class NotPinnedError(APIError):
+    """
+    Content not pinned or pinned indirectly
+    """
+
+
+class InvalidCIDError(APIError):
+    """
+    Invalid CID or selected encoding not supported
+    """
+
+
 class UnknownAPIError(APIError):
     pass

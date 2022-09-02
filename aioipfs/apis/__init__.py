@@ -77,6 +77,15 @@ class SubAPI(object):
                         raise APIError(code=code,
                                        message=msg,
                                        http_status=response.status)
+                    elif msg == 'not pinned or pinned indirectly':
+                        raise NotPinnedError(code=code,
+                                             message=msg,
+                                             http_status=response.status)
+                    elif msg.endswith(
+                            'invalid CID: selected encoding not supported'):
+                        raise InvalidCIDError(code=code,
+                                              message=msg,
+                                              http_status=response.status)
                     else:
                         raise UnknownAPIError()
 
