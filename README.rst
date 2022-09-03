@@ -7,7 +7,9 @@ aioipfs
 **aioipfs** is a python3 library providing an asynchronous API for IPFS_.
 Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*
 
-It supports the HTTP RPC API specifications for kubo_ version *0.15.0*.
+This library supports the
+`RPC API specifications <https://docs.ipfs.tech/reference/kubo/rpc>`_
+for kubo_ version *0.15.0*.
 
 .. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
     :target: https://github.com/pinnaculum/aioipfs
@@ -41,14 +43,13 @@ Get an IPFS resource
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(get(sys.argv[1]))
-    loop.close()
 
 Add some files
 --------------
 
 This example will import all files and directories specified on the command
 line. Note that the **add** API function is an asynchronous generator and
-therefore needs to be used with the *async for* syntax.
+therefore should be used with the *async for* syntax.
 
 .. code-block:: python
 
@@ -68,7 +69,12 @@ therefore needs to be used with the *async for* syntax.
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(add_files(sys.argv[1:]))
-    loop.close()
+
+You can also use the async list generator syntax:
+
+.. code-block:: python
+
+    cids = [entry['Hash'] async for entry in client.add(dir_path)]
 
 Pubsub service
 --------------

@@ -2,6 +2,7 @@ import pytest
 
 import tempfile
 import random
+import string
 import time
 import subprocess
 import os
@@ -18,6 +19,11 @@ def ipfs_getconfig_var(var):
                                      var], stdout=subprocess.PIPE)
     stdout, stderr = sp_getconfig.communicate()
     return stdout.decode()
+
+
+@pytest.fixture
+def datafiles():
+    return Path(os.path.dirname(__file__)).joinpath('datafiles')
 
 
 @pytest.fixture
@@ -45,6 +51,11 @@ def testfile2(tmpdir):
     for i in range(0, 128):
         filep.write(str(r.randint(i, i * 2)))
     return filep
+
+
+def random_word(length=8):
+    return ''.join(
+        random.choice(string.ascii_lowercase) for c in range(length))
 
 
 @pytest.fixture
@@ -157,9 +168,16 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
-    async def test_refs(self, event_loop, ipfsdaemon, iclient):
+    async def test_refs(self, event_loop, ipfsdaemon, iclient,
+                        testfile1):
+        # TODO: proper refs test from an object
+        cids = [added['Hash'] async for added in iclient.add(str(testfile1))]
+        await iclient.refs.refs(cids.pop(),
+                                max_depth=-1)
+
         async for refobj in iclient.refs.local():
             assert 'Ref' in refobj
+
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -449,20 +467,30 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize('keyname', ['key1'])
     @pytest.mark.parametrize('keysize', [2048, 4096])
     async def test_keys(self, event_loop, ipfsdaemon, iclient,
-                        keyname, keysize):
+                        keysize, datafiles):
+        keyname = random_word()
+
         reply = await iclient.key.gen(keyname, size=keysize)
         assert reply['Name'] == keyname
         key_hash = reply['Id']
 
         reply = await iclient.key.list()
-        # initial peer key + the one we just made
-        assert len(reply['Keys']) == 2
+        names = [k['Name'] for k in reply['Keys']]
+        assert keyname in names
 
         removed = await iclient.key.rm(keyname)
         assert removed['Keys'].pop()['Id'] == key_hash
+
+        # Key import test
+        impname = random_word()
+        reply = await iclient.key.key_import(
+            str(datafiles.joinpath('ipns-key1')),
+            impname
+        )
+        assert reply['Name'] == impname
+
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -504,6 +532,20 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize('obj', [b'0123456789'])
+    async def test_files_cp(self, event_loop, ipfsdaemon, iclient, obj):
+        await iclient.files.write('/test8', obj, create=True)
+        await iclient.files.cp('/test8', '/test9')
+
+        files = await iclient.files.ls('/')
+        names = [e['Name'] for e in files['Entries']]
+        assert 'test8' in names
+        assert 'test9' in names
+
+        data = await iclient.files.read('/test9')
+        assert data == obj
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize('obj1', [b'0123456789'])
     @pytest.mark.parametrize('obj2', [b'0a1b2c3d4e5'])
     async def test_object(self, event_loop, ipfsdaemon, iclient, obj1, obj2,
@@ -528,8 +570,10 @@ class TestAsyncIPFS:
         assert data1 == obj1
         assert data2 == obj2
 
-        with pytest.raises(aioipfs.APIError):
+        with pytest.raises(aioipfs.NoSuchLinkError) as exc:
             await iclient.object.patch.rm_link(obj['Hash'], 'obj1')
+
+        assert exc.value.message == 'no link by that name'
 
         rm = await iclient.object.patch.rm_link(r2['Hash'], 'obj1')
         dag = await iclient.object.get(rm['Hash'])
@@ -543,6 +587,26 @@ class TestAsyncIPFS:
         sameconf = tmpdir.join('config.json')
         sameconf.write(json.dumps(conf))
         await iclient.config.replace(str(sameconf))
+
+        await iclient.config.config(
+            'Datastore.StorageGCWatermark', value=150,
+            json=True
+        )
+
+        await iclient.config.config(
+            'Datastore.HashOnRead', value=True,
+            boolean=True
+        )
+
+        result = await iclient.config.config('Datastore.StorageGCWatermark')
+        assert result['Value'] == 150
+
+        result = await iclient.config.config('Datastore.HashOnRead')
+        assert result['Value'] is True
+
+        result = await iclient.config.config('Bootstrap')
+        assert result['Value'] == []
+
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -563,8 +627,8 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     @pytest.mark.parametrize('srvname', ['mysrv1'])
     @pytest.mark.parametrize('srvendpoint', ['http://localhost:9580'])
-    async def _no_test_pin_remote(self, event_loop, ipfsdaemon, iclient,
-                                  srvname, srvendpoint):
+    async def test_pin_remote(self, event_loop, ipfsdaemon, iclient,
+                              srvname, srvendpoint):
         res = await iclient.pin.remote.service.add(
             srvname,
             srvendpoint,
@@ -580,22 +644,18 @@ class TestAsyncIPFS:
         entry = await iclient.core.add_bytes(b'ABCD')
 
         # Try a remote pin (will fail, service does not exist)
-        try:
+        with pytest.raises(aioipfs.PinRemoteError):
             res = await iclient.pin.remote.add(
                 srvname,
                 f'/ipfs/{entry["Hash"]}'
             )
-        except aioipfs.APIError:
-            pass
 
-        try:
+        with pytest.raises(aioipfs.PinRemoteError):
             async for entry in iclient.pin.remote.ls(
                 srvname,
                 status=['queued']
             ):
                 print(entry)
-        except aioipfs.APIError as e:
-            print(e.message)
 
         await iclient.pin.remote.service.rm(srvname)
         res = await iclient.pin.remote.service.ls()

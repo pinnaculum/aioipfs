@@ -11,7 +11,7 @@ from aioipfs import UnknownAPIError
 class DagAPI(SubAPI):
     async def put(self, filename,
                   store_codec='dag-cbor', input_codec='dag-json',
-                  hashfn='sha2-256', pin=False,
+                  hashfn='sha2-256', pin=True,
                   allow_big_block=False):
         """
         Add a DAG node to IPFS
@@ -56,15 +56,21 @@ class DagAPI(SubAPI):
             params={ARG_PARAM: cid, 'progress': boolarg(progress)}
         )
 
-    async def get(self, objpath):
+    async def get(self, objpath, output_codec=None):
         """
         Get a DAG node from IPFS
 
         :param str objpath: path of the object to fetch
+        :param str output_codec: Format that the object will be encoded as
         """
 
+        params = {ARG_PARAM: objpath}
+
+        if isinstance(output_codec, str):
+            params['output-codec'] = output_codec
+
         return await self.fetch_text(self.url('dag/get'),
-                                     params={ARG_PARAM: objpath})
+                                     params=params)
 
     async def stat(self, cid, progress=True):
         """

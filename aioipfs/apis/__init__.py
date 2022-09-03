@@ -2,9 +2,11 @@ import json
 import asyncio
 import sys
 
-from aiohttp.web_exceptions import (HTTPError,
-                                    HTTPInternalServerError,
-                                    HTTPServerError, HTTPBadRequest)
+from aiohttp.web_exceptions import (HTTPInternalServerError,
+                                    HTTPForbidden,
+                                    HTTPNotFound,
+                                    HTTPMethodNotAllowed,
+                                    HTTPBadRequest)
 from aiohttp.client_exceptions import *  # noqa
 
 from aioipfs.helpers import *  # noqa
@@ -16,8 +18,9 @@ DEFAULT_TIMEOUT = 60 * 60
 HTTP_ERROR_CODES = [
     HTTPInternalServerError.status_code,
     HTTPBadRequest.status_code,
-    HTTPError.status_code,
-    HTTPServerError.status_code
+    HTTPForbidden.status_code,
+    HTTPNotFound.status_code,
+    HTTPMethodNotAllowed.status_code
 ]
 
 
@@ -35,28 +38,61 @@ class SubAPI(object):
         return self.driver.api_endpoint(path)
 
     def decode_error(self, errormsg):
+        """
+        Decode a (JSON) error message from the daemon and
+        return a tuple (text_message, error_code)
+        """
         try:
             decoded_json = json.loads(errormsg)
+            mtype = decoded_json.get('Type')
+            assert mtype.lower() == 'error'
             return decoded_json['Message'], decoded_json['Code']
         except Exception:
             return None, None
+
+    def handle_error(self, response, data):
+        """
+        When the daemon returns an HTTP status code != 200, this
+        method is called to raise an API exception.
+        """
+        msg, code = self.decode_error(data)
+
+        if isinstance(msg, str) and code is not None:
+            # Check for specific errors
+
+            for errclass in [NotPinnedError,
+                             InvalidCIDError,
+                             NoSuchLinkError,
+                             IpnsKeyError,
+                             PinRemoteError]:
+                if errclass.match(msg) is True:
+                    raise errclass(
+                        code=code,
+                        message=msg,
+                        http_status=response.status
+                    )
+
+            # Otherwise raise a generic error
+            raise APIError(code=code,
+                           message=msg,
+                           http_status=response.status)
+        else:
+            raise UnknownAPIError()
 
     async def fetch_text(self, url, params={}, timeout=DEFAULT_TIMEOUT):
         async with self.driver.session.post(url, params=params) as response:
             status, textdata = response.status, await response.text()
             if status in HTTP_ERROR_CODES:
-                msg, code = self.decode_error(textdata)
-                raise APIError(code=code, message=msg,
-                               http_status=status)
+                self.handle_error(response, textdata)
+
             return textdata
 
     async def fetch_raw(self, url, params={}, timeout=DEFAULT_TIMEOUT):
         async with self.driver.session.post(url, params=params) as response:
             status, data = response.status, await response.read()
             if status in HTTP_ERROR_CODES:
-                msg, code = self.decode_error(data)
-                raise APIError(code=code, message=msg,
-                               http_status=status)
+                self.handle_error(response, data)
+
             return data
 
     async def fetch_json(self, url, params={}, timeout=DEFAULT_TIMEOUT):
@@ -69,25 +105,9 @@ class SubAPI(object):
                                                 headers=headers,
                                                 params=params) as response:
                 if response.status in HTTP_ERROR_CODES:
-                    msg, code = self.decode_error(
-                        await response.read()
+                    return self.handle_error(
+                        response, await response.read()
                     )
-
-                    if msg and code:
-                        raise APIError(code=code,
-                                       message=msg,
-                                       http_status=response.status)
-                    elif msg == 'not pinned or pinned indirectly':
-                        raise NotPinnedError(code=code,
-                                             message=msg,
-                                             http_status=response.status)
-                    elif msg.endswith(
-                            'invalid CID: selected encoding not supported'):
-                        raise InvalidCIDError(code=code,
-                                              message=msg,
-                                              http_status=response.status)
-                    else:
-                        raise UnknownAPIError()
 
                 if outformat == 'text':
                     return await response.text()
@@ -155,9 +175,7 @@ class SubAPI(object):
 
                     if message is not None:
                         if 'Message' in message and 'Code' in message:
-                            raise APIError(code=message['Code'],
-                                           message=message['Message'],
-                                           http_status=response.status)
+                            self.handle_error(response, raw_message)
                         else:
                             yield message
 

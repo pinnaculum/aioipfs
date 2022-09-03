@@ -93,14 +93,14 @@ class PinAPI(SubAPI):
 
         self.remote = PinRemoteAPI(driver)
 
-    async def add(self, multihash, recursive=True, progress=True):
+    async def add(self, path, recursive=True, progress=True):
         """
         Pin objects to local storage.
         """
 
         # We request progress status by default
         params = {
-            ARG_PARAM: multihash,
+            ARG_PARAM: path,
             'recursive': boolarg(recursive),
             'progress': boolarg(progress)
         }
@@ -109,28 +109,30 @@ class PinAPI(SubAPI):
                 self.url('pin/add'), params=params):
             yield added
 
-    async def ls(self, multihash=None, pintype='all', quiet=False):
+    async def ls(self, path=None, pintype='all', quiet=False,
+                 stream: bool = False):
         """
         List objects pinned to local storage.
         """
 
         params = {
             'type': pintype,
-            'quiet': boolarg(quiet)
+            'quiet': boolarg(quiet),
+            'stream': boolarg(stream)
         }
-        if multihash:
-            params[ARG_PARAM] = multihash
+        if path:
+            params[ARG_PARAM] = path
 
         return await self.fetch_json(self.url('pin/ls'),
                                      params=params)
 
-    async def rm(self, multihash, recursive=True):
+    async def rm(self, path, recursive=True):
         """
         Remove pinned objects from local storage.
         """
 
         params = {
-            ARG_PARAM: multihash,
+            ARG_PARAM: path,
             'recursive': boolarg(recursive)
         }
         return await self.fetch_json(self.url('pin/rm'),

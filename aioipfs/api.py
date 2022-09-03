@@ -177,12 +177,18 @@ class BitswapAPI(SubAPI):
 
         return await self.fetch_text(self.url('bitswap/reprovide'))
 
-    async def stat(self):
+    async def stat(self, verbose=False, human=False):
         """
         Show some diagnostic information on the bitswap agent.
         """
 
-        return await self.fetch_json(self.url('bitswap/stat'))
+        params = {
+            'verbose': boolarg(verbose),
+            'human': boolarg(human)
+        }
+
+        return await self.fetch_json(self.url('bitswap/stat'),
+                                     params=params)
 
     async def wantlist(self, peer=None):
         """
@@ -198,6 +204,8 @@ class BitswapAPI(SubAPI):
     async def unwant(self, block):
         """
         Remove a given block from your wantlist.
+
+        (this command has been deprecated it seems).
 
         :param str block: Key(s) to remove from your wantlist
         """
@@ -245,15 +253,20 @@ class BlockAPI(SubAPI):
         return await self.fetch_json(self.url('block/stat'),
                                      params={ARG_PARAM: multihash})
 
-    async def put(self, filepath, format='v0', mhtype='sha2-256', mhlen=-1):
+    async def put(self, filepath, cid_codec=None,
+                  format='v0', mhtype='sha2-256', mhlen=-1,
+                  allow_big_block=False, pin=True):
         """
         Store input as an IPFS block.
 
+        :param str cid_codec: Multicodec to use in returned CID
+        :param bool allow_big_block: Disable block size check and allow
+            creation of blocks bigger than 1MiB
         :param str filepath: The path to a file containing the data for the
             block
-        :param str format: cid format for blocks
         :param str mhtype: multihash hash function
         :param int mhlen: multihash hash length
+        :param bool pin: pin block
         """
 
         if not os.path.exists(filepath):
@@ -261,10 +274,14 @@ class BlockAPI(SubAPI):
                 filepath))
 
         params = {
-            'format': format,
             'mhtype': mhtype,
-            'mhlen': mhlen
+            'mhlen': mhlen,
+            'pin': boolarg(pin),
+            'allow-big-block': boolarg(allow_big_block)
         }
+
+        if isinstance(cid_codec, str):
+            params['cid-codec'] = cid_codec
 
         with multi.FormDataWriter() as mpwriter:
             block_payload = payload.BytesIOPayload(open(filepath, 'rb'))
@@ -281,12 +298,11 @@ class BlockAPI(SubAPI):
 class BootstrapAPI(SubAPI):
     """ Bootstrap API """
 
-    async def add(self, peer, default=False):
-        params = {
-            ARG_PARAM: peer,
-            'default': boolarg(default)
-        }
-        return await self.fetch_json(self.url('bootstrap/add'), params=params)
+    async def add(self, peer):
+        return await self.fetch_json(
+            self.url('bootstrap/add'),
+            params={ARG_PARAM: peer}
+        )
 
     async def add_default(self):
         return await self.fetch_json(self.url('bootstrap/add/default'))
@@ -295,13 +311,11 @@ class BootstrapAPI(SubAPI):
         """ Shows peers in the bootstrap list """
         return await self.fetch_json(self.url('bootstrap/list'))
 
-    async def rm(self, peer=None, all=False):
-        params = {}
-        if peer:
-            params[ARG_PARAM] = peer
-        if all:
-            params['all'] = boolarg(all)
-        return await self.fetch_json(self.url('bootstrap/rm'), params=params)
+    async def rm(self, peer: str):
+        return await self.fetch_json(
+            self.url('bootstrap/rm'),
+            params={ARG_PARAM: peer}
+        )
 
     async def rm_all(self):
         """ Removes all peers in the bootstrap list """
@@ -322,9 +336,10 @@ class CidAPI(SubAPI):
         }
         return await self.fetch_json(self.url('cid/bases'), params=params)
 
-    async def codecs(self, numeric=False):
+    async def codecs(self, numeric=False, supported=False):
         params = {
-            'numeric': boolarg(numeric)
+            'numeric': boolarg(numeric),
+            'supported': boolarg(supported)
         }
         return await self.fetch_json(self.url('cid/codecs'), params=params)
 
@@ -353,15 +368,43 @@ class CidAPI(SubAPI):
 
         return await self.fetch_json(self.url('cid/format'), params=params)
 
-    async def hashes(self, numeric=False):
+    async def hashes(self, numeric=False, supported=False):
         params = {
-            'numeric': boolarg(numeric)
+            'numeric': boolarg(numeric),
+            'supported': boolarg(supported)
         }
         return await self.fetch_json(self.url('cid/hashes'), params=params)
 
 
 class ConfigAPI(SubAPI):
     """ Configuration management API """
+
+    async def config(self,
+                     key: str,
+                     value=None,
+                     boolean: bool = False,
+                     json: bool = False):
+        """
+        Get and set IPFS config values
+        """
+
+        params = {}
+
+        if value is not None:
+            if boolean:
+                params[ARG_PARAM] = [key, boolarg(value)]
+            else:
+                params[ARG_PARAM] = [key, value]
+        else:
+            params = {ARG_PARAM: key}
+
+        params['bool'] = boolarg(boolean)
+        params['json'] = boolarg(json)
+
+        return await self.fetch_json(
+            self.url('config'),
+            params=params
+        )
 
     async def show(self):
         """ Outputs IPFS config file contents """
@@ -447,8 +490,51 @@ class DiagAPI(SubAPI):
     async def sys(self):
         return await self.fetch_json(self.url('diag/sys'))
 
+    async def cmds(self, verbose=False):
+        """
+        List commands run on this IPFS node.
+        """
+        return await self.fetch_json(self.url('diag/cmds'),
+                                     params={'verbose': boolarg(verbose)})
+
+    async def cmds_set_time(self, time: str):
+        """
+        Set how long to keep inactive requests in the log.
+        """
+        return await self.fetch_text(self.url('diag/cmds/set-time'),
+                                     params={ARG_PARAM: time})
+
     async def cmds_clear(self):
         return await self.fetch_text(self.url('diag/cmds/clear'))
+
+    async def profile(self,
+                      output: str = None,
+                      collectors: list = None,
+                      profile_time: str = None,
+                      mutex_profile_fraction: int = None,
+                      block_profile_rate: str = None):
+        """
+        Collect a performance profile for debugging.
+
+        TODO: support passing collectors as an array
+        """
+
+        params = {}
+
+        if isinstance(output, str):
+            params['output'] = output
+
+        if isinstance(profile_time, str):
+            params['profile-time'] = profile_time
+
+        if isinstance(mutex_profile_fraction, int):
+            params['mutex-profile-fraction'] = mutex_profile_fraction
+
+        if isinstance(block_profile_rate, str):
+            params['block-profile-rate'] = block_profile_rate
+
+        return await self.fetch_text(self.url('diag/profile'),
+                                     params=params)
 
 
 class FileAPI(SubAPI):
@@ -458,22 +544,44 @@ class FileAPI(SubAPI):
 
 
 class FilesAPI(SubAPI):
-    async def cp(self, source, dest):
-        params = quote_args(source, dest)
+    async def cp(self, source, dest, parents: bool = False):
+        """
+        Add references to IPFS files and directories in MFS
+        (or copy within MFS).
+        """
+
+        params = quote_dict({
+            ARG_PARAM: [source, dest],
+            'parents': boolarg(parents)
+        })
+
         return await self.fetch_text(self.url('files/cp'),
                                      params=params)
 
-    async def chcid(self, path, cidversion):
+    async def chcid(self, path: str,
+                    cidversion: int,
+                    hashfn: str = None):
         params = {ARG_PARAM: path, 'cid-version': str(cidversion)}
+
+        if isinstance(hashfn, str):
+            params['hash'] = hashfn
+
         return await self.fetch_text(self.url('files/chcid'), params=params)
 
-    async def flush(self, path):
+    async def flush(self, path: str = '/'):
+        """
+        Flush a given path's data to disk.
+        """
         params = {ARG_PARAM: path}
         return await self.fetch_text(self.url('files/flush'),
                                      params=params)
 
-    async def mkdir(self, path, parents=False, cid_version=None):
+    async def mkdir(self, path, parents=False, cid_version=None,
+                    hashfn: str = None):
         params = {ARG_PARAM: path, 'parents': boolarg(parents)}
+
+        if isinstance(hashfn, str):
+            params['hash'] = hashfn
 
         if cid_version is not None and isinstance(cid_version, int):
             params['cid-version'] = str(cid_version)
@@ -495,7 +603,9 @@ class FilesAPI(SubAPI):
         return await self.fetch_json(self.url('files/ls'),
                                      params=params)
 
-    async def read(self, path, offset=None, count=None):
+    async def read(self, path,
+                   offset: int = None,
+                   count: int = None):
         params = {ARG_PARAM: path}
 
         if offset is not None and isinstance(offset, int):
@@ -506,7 +616,8 @@ class FilesAPI(SubAPI):
         return await self.fetch_raw(self.url('files/read'),
                                     params=params)
 
-    async def rm(self, path, recursive=False, force=False):
+    async def rm(self, path,
+                 recursive: bool = False, force: bool = False):
         params = {
             ARG_PARAM: path,
             'recursive': boolarg(recursive),
@@ -532,6 +643,8 @@ class FilesAPI(SubAPI):
 
     async def write(self, mfspath, data, create=False,
                     parents=False, cid_version=None,
+                    raw_leaves=False,
+                    hashfn: str = None,
                     truncate=False, offset=-1, count=-1):
         """
         Write to a mutable file in a given filesystem.
@@ -543,12 +656,15 @@ class FilesAPI(SubAPI):
         :param bol truncate: Truncate the file to size zero before writing
         :param int count: Maximum number of bytes to read
         :param int cid_version: CID version to use
+        :param str hashfn: Hash function to use. Will set Cid
+            version to 1 if used. (experimental).
         """
 
         params = {
             ARG_PARAM: mfspath,
             'create': boolarg(create),
             'parents': boolarg(parents),
+            'raw-leaves': boolarg(raw_leaves),
             'truncate': boolarg(truncate)
         }
 
@@ -559,6 +675,9 @@ class FilesAPI(SubAPI):
 
         if isinstance(cid_version, int):
             params['cid-version'] = str(cid_version)
+
+        if isinstance(hashfn, str):
+            params['hash'] = hashfn
 
         if isinstance(data, bytes):
             file_payload = payload.BytesPayload(data)
@@ -601,8 +720,51 @@ class FilestoreAPI(SubAPI):
 
 
 class KeyAPI(SubAPI):
+    async def key_import(self,
+                         keypath: str,
+                         name,
+                         ipns_base: str = None,
+                         format='libp2p-protobuf-cleartext',
+                         allow_any_keytype: bool = False):
+        """
+        Import a key and prints imported key id
+
+        :param str keypath: filepath of the key to import
+        :param str name: name to associate with key in keychain
+        :param str ipns_base: Encoding used for keys: Can either be a
+            multibase encoded CID or a base58btc encoded multihash
+        :param str format: The format of the private key to import,
+            libp2p-protobuf-cleartext or pem-pkcs8-cleartext
+        :param bool allow_any_keytype: Allow importing any key type
+        """
+
+        params = {
+            ARG_PARAM: name,
+            'format': format,
+            'allow-any-key-type': boolarg(allow_any_keytype)
+        }
+
+        if isinstance(ipns_base, str):
+            params['ipns-base'] = ipns_base
+
+        with multi.FormDataWriter() as mpwriter:
+            mpwriter.append_payload(multi.bytes_payload_from_file(keypath))
+
+            return await self.post(self.url('key/import'),
+                                   mpwriter, params=params,
+                                   outformat='json')
+
     async def export(self, name, output=None,
                      format='libp2p-protobuf-cleartext'):
+        """
+        Export a keypair
+
+        :param str name: name of the key to export
+        :param str output: The path where the output should be stored
+        :param str format: The format of the private key to import,
+            libp2p-protobuf-cleartext or pem-pkcs8-cleartext
+        """
+
         params = {
             ARG_PARAM: name,
             'format': format
@@ -614,23 +776,46 @@ class KeyAPI(SubAPI):
         return await self.fetch_json(self.url('key/export'),
                                      params=params)
 
-    async def list(self, long=False):
+    async def list(self, long=False,
+                   ipns_base: str = None):
         params = {'l': boolarg(long)}
+
+        if isinstance(ipns_base, str):
+            params['ipns-base'] = ipns_base
+
         return await self.fetch_json(self.url('key/list'),
                                      params=params)
 
-    async def gen(self, name, type='rsa', size=2048):
+    async def gen(self, name, type='rsa', size: int = 2048,
+                  ipns_base: str = None):
         params = {ARG_PARAM: name, 'type': type, 'size': str(size)}
+
+        if isinstance(ipns_base, str):
+            params['ipns-base'] = ipns_base
+
         return await self.fetch_json(self.url('key/gen'),
                                      params=params)
 
-    async def rm(self, name):
+    async def rm(self, name,
+                 ipns_base: str = None):
         params = {ARG_PARAM: name}
+
+        if isinstance(ipns_base, str):
+            params['ipns-base'] = ipns_base
+
         return await self.fetch_json(self.url('key/rm'), params=params)
 
-    async def rename(self, src, dst, ipns_base=None):
-        params = quote_args(src, dst)
-        return await self.fetch_json(self.url('key/rename'), params=params)
+    async def rename(self, src, dst, ipns_base=None, force: bool = False):
+        params = {
+            ARG_PARAM: [src, dst],
+            'force': boolarg(force)
+        }
+
+        if isinstance(ipns_base, str):
+            params['ipns-base'] = ipns_base
+
+        return await self.fetch_json(self.url('key/rename'),
+                                     params=quote_dict(params))
 
     async def rotate(self, old_key=None, key_type=None, size=None):
         params = {}
@@ -641,7 +826,7 @@ class KeyAPI(SubAPI):
         if size:
             params['size'] = size
 
-        return await self.fetch_json(self.url('key/rotate'), params=params)
+        return await self.fetch_text(self.url('key/rotate'), params=params)
 
 
 class LogAPI(SubAPI):
@@ -695,7 +880,8 @@ class NameAPI(SubAPI):
 
     async def publish(self, path, resolve=True, lifetime='24h',
                       key='self', ttl=None,
-                      quieter=False, allow_offline=False):
+                      quieter=False, allow_offline=False,
+                      ipns_base: str = None):
         params = {
             ARG_PARAM: path,
             'resolve': boolarg(resolve),
@@ -704,6 +890,10 @@ class NameAPI(SubAPI):
             'quieter': boolarg(quieter),
             'allow-offline': boolarg(allow_offline)
         }
+
+        if isinstance(ipns_base, str):
+            params['ipns-base'] = ipns_base
+
         if isinstance(ttl, int):
             params['ttl'] = ttl
 
@@ -855,7 +1045,7 @@ class ObjectAPI(SubAPI):
         return await self.fetch_raw(self.url('object/data'), params=params)
 
     async def put(self, filepath, input_enc='json', datafield_enc='text',
-                  pin=None, quiet=True):
+                  pin=True, quiet=True):
         if not os.path.isfile(filepath):
             raise Exception(
                 'object put: {} file does not exist'.format(filepath))
@@ -875,6 +1065,32 @@ class ObjectAPI(SubAPI):
 
 
 class RefsAPI(SubAPI):
+    async def refs(self,
+                   path: str,
+                   format: str = None,
+                   edges: bool = False,
+                   unique: bool = False,
+                   recursive: bool = False,
+                   max_depth: int = None):
+        """
+        List links (references) from an object.
+        """
+        params = {
+            ARG_PARAM: path,
+            'unique': boolarg(unique),
+            'recursive': boolarg(recursive),
+            'edges': boolarg(edges)
+        }
+
+        if isinstance(max_depth, int):
+            params['max_depth'] = str(max_depth)
+
+        if isinstance(format, str):
+            params['format'] = format
+
+        return await self.fetch_json(self.url('refs'),
+                                     params=params)
+
     async def local(self):
         async for ref in self.mjson_decode(self.url('refs/local')):
             yield ref
@@ -1273,18 +1489,30 @@ class CoreAPI(SubAPI):
 
                 raise err
 
-    async def commands(self):
+    async def commands(self, flags=False):
         """ List all available commands."""
 
-        return await self.fetch_json(self.url('commands'))
+        return await self.fetch_json(
+            self.url('commands'),
+            params={'flags': boolarg(flags)}
+        )
 
-    async def id(self, peer=None):
+    async def id(self, peer: str = None,
+                 format: str = None,
+                 peerid_base: str = None):
         """
         Show IPFS node id info.
 
         :param str peer: peer id to look up, otherwise shows local node info
         """
         params = {ARG_PARAM: peer} if peer else {}
+
+        if isinstance(format, str):
+            params['format'] = format
+
+        if isinstance(peerid_base, str):
+            params['peerid-base'] = peerid_base
+
         return await self.fetch_json(self.url('id'), params=params)
 
     async def cat(self, multihash, offset=None, length=None):
@@ -1463,7 +1691,9 @@ class CoreAPI(SubAPI):
             else:
                 yield -1, None, None
 
-    async def ls(self, path, headers=False, resolve_type=True):
+    async def ls(self, path, headers=False, resolve_type=True,
+                 size: bool = True,
+                 stream: bool = False):
         """
         List directory contents for Unix filesystem objects.
 
@@ -1475,6 +1705,8 @@ class CoreAPI(SubAPI):
         params = {
             'resolve-type': boolarg(resolve_type),
             'headers': boolarg(headers),
+            'size': boolarg(size),
+            'stream': boolarg(stream),
             ARG_PARAM: path
         }
         return await self.fetch_json(self.url('ls'), params=params)
