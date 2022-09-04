@@ -26,6 +26,34 @@ Installation
 Usage examples
 ==============
 
+Client instantiation
+--------------------
+
+The recommended way to specify the kubo node's RPC API address is
+to pass a multiaddr_.
+
+.. code-block:: python
+
+    client = aioipfs.AsyncIPFS(maddr='/ip4/127.0.0.1/tcp/5001')
+
+    client = aioipfs.AsyncIPFS(maddr='/dns4/localhost/tcp/5001')
+
+You can also pass a *multiaddr.Multiaddr* instance.
+
+.. code-block:: python
+
+    from multiaddr import Multiaddr
+
+    client = aioipfs.AsyncIPFS(maddr=Multiaddr('/ip4/127.0.0.1/tcp/5001'))
+
+Otherwise just pass *host* and *port* separately:
+
+.. code-block:: python
+
+    client = aioipfs.AsyncIPFS(host='localhost', port=5001)
+
+    client = aioipfs.AsyncIPFS(host='::1', port=5201)
+
 Get an IPFS resource
 --------------------
 
@@ -108,6 +136,7 @@ Requirements
 
 .. _aiohttp: https://pypi.python.org/pypi/aiohttp
 .. _aiofiles: https://pypi.python.org/pypi/aiofiles
+.. _multiaddr: https://multiformats.io/multiaddr/
 .. _py-multibase: https://pypi.python.org/pypi/py-multibase
 .. _yarl: https://pypi.python.org/pypi/yarl
 .. _IPFS: https://ipfs.io

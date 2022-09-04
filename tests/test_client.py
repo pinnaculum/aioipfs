@@ -9,6 +9,7 @@ import os
 import os.path
 import json
 from pathlib import Path
+from multiaddr import Multiaddr
 
 import asyncio
 import aioipfs
@@ -91,7 +92,7 @@ def ipfs_config(param, value):
 
 
 def ipfs_config_json(param, value):
-    os.system('ipfs config --json {0} "{1}"'.format(
+    os.system("ipfs config --json '{0}' '{1}'".format(
         param, json.dumps(value)))
 
 
@@ -110,17 +111,23 @@ def ipfsdaemon():
     # Setup IPFS_PATH and initialize the repository
     os.putenv('IPFS_PATH', tmpdir)
     os.system('ipfs init -e')
-    ipfs_config('Addresses.API',
-                '/ip4/127.0.0.1/tcp/{0}'.format(apiport))
+
+    ipfs_config_json(
+        'Addresses.API', [
+            f'/ip4/127.0.0.1/tcp/{apiport}',
+            f'/ip6/::1/tcp/{apiport}',
+        ]
+    )
+
     ipfs_config('Addresses.Gateway',
                 '/ip4/127.0.0.1/tcp/{0}'.format(gwport))
     ipfs_config_json('Addresses.Swarm',
-                     '["/ip4/127.0.0.1/tcp/{0}"]'.format(swarmport))
+                     [f"/ip4/127.0.0.1/tcp/{swarmport}"])
 
     # Empty bootstrap so we're not bothered
-    ipfs_config_json('Bootstrap', '[]')
-    ipfs_config_json('Experimental.Libp2pStreamMounting', 'true')
-    ipfs_config_json('Experimental.FilestoreEnabled', 'true')
+    ipfs_config_json('Bootstrap', [])
+    ipfs_config_json('Experimental.Libp2pStreamMounting', True)
+    ipfs_config_json('Experimental.FilestoreEnabled', True)
 
     # Run the daemon and wait a bit
     sp = subprocess.Popen(['ipfs', 'daemon', '--enable-pubsub-experiment'],
@@ -142,6 +149,78 @@ def ipfs_peerid(ipfsdaemon):
 @pytest.fixture()
 def iclient(event_loop):
     return aioipfs.AsyncIPFS(port=apiport, loop=event_loop)
+
+
+class TestClientConstructor:
+    @pytest.mark.asyncio
+    async def test_invalid_constructor(self, event_loop):
+        # Invalid host
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(host=None, loop=event_loop)
+
+        # Invalid port
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(host='localhost', port=None, loop=event_loop)
+
+        # Invalid multiaddr
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(maddr='invalid', loop=event_loop)
+
+        # Incomplete multiaddrs
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(maddr='/ip4/127.0.0.1', loop=event_loop)
+
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(maddr='/ip6/::1', loop=event_loop)
+
+        # 'localhost' is not a valid IPv4 for the ip4 codec
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(maddr='/ip4/localhost/tcp/8000', loop=event_loop)
+
+        # UDP protocol is of course not supported for the RPC
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(maddr='/ip4/127.0.0.1/udp/4000', loop=event_loop)
+
+    @pytest.mark.asyncio
+    async def test_constructor_apiurl(self, event_loop, ipfsdaemon):
+        # Test by passing a valid /ip4/x.x.x.x/tcp/port multiaddr
+        client = aioipfs.AsyncIPFS(
+            maddr=f'/ip4/127.0.0.1/tcp/{apiport}', loop=event_loop)
+
+        assert str(client.api_url) == f'http://127.0.0.1:{apiport}/api/v0/'
+
+        # Test by passing a valid /dns4/host/tcp/port multiaddr
+        client = aioipfs.AsyncIPFS(
+            maddr=f'/dns4/localhost/tcp/{apiport}'
+        )
+        assert str(client.api_url) == f'http://localhost:{apiport}/api/v0/'
+
+        # Test by passing a valid /dns6/host/tcp/port multiaddr
+        client = aioipfs.AsyncIPFS(
+            maddr=f'/dns6/example.com/tcp/{apiport}'
+        )
+        assert str(client.api_url) == f'http://example.com:{apiport}/api/v0/'
+
+        # Test by passing a valid /ip6/.../tcp/port multiaddr
+        client = aioipfs.AsyncIPFS(
+            maddr=f'/ip6/::1/tcp/{apiport}', loop=event_loop)
+
+        assert str(client.api_url) == f'http://[::1]:{apiport}/api/v0/'
+
+        # Test request via IPv6
+        info = await client.id()
+        assert 'ID' in info
+
+        # Test by passing a Multiaddr instance
+        client = aioipfs.AsyncIPFS(
+            maddr=Multiaddr(f'/ip4/127.0.0.1/tcp/{apiport}')
+        )
+
+        assert str(client.api_url) == f'http://127.0.0.1:{apiport}/api/v0/'
+
+        # The default constructor should always use localhost:5001
+        client = aioipfs.AsyncIPFS()
+        assert str(client.api_url) == 'http://localhost:5001/api/v0/'
 
 
 class TestAsyncIPFS:

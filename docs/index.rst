@@ -21,14 +21,20 @@ Asynchronous IPFS client API for Python3's asyncio.
 Async IPFS client
 =================
 
-Creating an :class:`~aioipfs.AsyncIPFS` client::
+To create an :class:`~aioipfs.AsyncIPFS` client instance it's
+recommended to specify the node's RPC API address with a multiaddr_::
 
     import aioipfs
 
-    client = aioipfs.AsyncIPFS()
+    client = aioipfs.AsyncIPFS(maddr='/ip4/127.0.0.1/tcp/5001')
 
-which would assume you are connecting to the IPFS daemon on *localhost* on port
-5001 (default IPFS API port). You can specify alternative parameters::
+    client = aioipfs.AsyncIPFS(maddr='/dns4/localhost/tcp/5001')
+
+The default constructor assumes that the kubo_ node you want to
+connect to is *localhost* on port *5001* (use the *host* and *port*
+keyword arguments to set different values)::
+
+    client = aioipfs.AsyncIPFS()
 
     client = aioipfs.AsyncIPFS(host='10.0.12.3', port=5003)
 
@@ -136,7 +142,7 @@ Pin API
 
 .. attribute:: aioipfs.AsyncIPFS.pin
 
-    Gives access to the :class:`~api.PinAPI` 
+    Gives access to the :class:`~apis.pin.PinAPI`
 
 Pinning a multihash or an IPFS path::
 
@@ -296,3 +302,6 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+.. _multiaddr: https://multiformats.io/multiaddr/
+.. _kubo: https://github.com/ipfs/kubo

@@ -1,4 +1,5 @@
 aiohttp>=3.7.4
 aiofiles>=0.7.0
+multiaddr>=0.0.9
 orjson>=3.0
 py-multibase>=1.0.0,<2.0.0

@@ -1,6 +1,10 @@
 import re
 
 
+class InvalidNodeAddressError(Exception):
+    pass
+
+
 class IPFSConnectionError(Exception):
     pass
 

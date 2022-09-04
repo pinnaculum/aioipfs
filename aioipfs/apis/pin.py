@@ -4,11 +4,24 @@ from aioipfs.helpers import *  # noqa
 
 class PinRemoteServiceAPI(SubAPI):
     async def add(self, service, endpoint, key):
+        """
+        Add remote pinning service.
+
+        :param str service: Service name
+        :param str endpoint: Service endpoint
+        :param str key: Service key
+        """
         return await self.fetch_json(
             self.url('pin/remote/service/add'),
             params=quote_args(service, endpoint, key))
 
     async def ls(self, stat=False):
+        """
+        List remote pinning services.
+
+        :param bool stat: Try to fetch and display current pin count
+            on remote service (queued/pinning/pinned/failed)
+        """
         params = {
             'stat': boolarg(stat)
         }
@@ -17,6 +30,11 @@ class PinRemoteServiceAPI(SubAPI):
                                      params=params)
 
     async def rm(self, service):
+        """
+        Remove remote pinning service.
+
+        :param str service: Service name
+        """
         return await self.fetch_json(
             self.url('pin/remote/service/rm'),
             params=quote_args(service))
@@ -32,6 +50,17 @@ class PinRemoteAPI(SubAPI):
                   service: str, objPath: str,
                   name=None,
                   background=False):
+        """
+        Pin object to remote pinning service.
+
+        :param str service: Service name
+        :param str objPath: Path to object(s) to be pinned
+        :param str name: An optional name for the pin
+        :param bool background: Add to the queue on the remote service
+            and return immediately (does not wait for pinned status)
+            Default: false
+        """
+
         params = {
             'service': service,
             ARG_PARAM: objPath,
@@ -50,6 +79,17 @@ class PinRemoteAPI(SubAPI):
                  name=None,
                  cid: list = [],
                  status: list = ['pinned']):
+        """
+        List objects pinned to remote pinning service.
+
+        :param str service: Name of the remote pinning service to use
+        :param str name: Return pins with names that contain the value
+            provided (case-sensitive, exact match)
+        :param list cid: Return pins for the specified CIDs
+        :param list status: Return pins with the specified statuses
+            (queued,pinning,pinned,failed). Default: [pinned]
+        """
+
         params = {
             'service': service,
             'status': status
@@ -71,6 +111,18 @@ class PinRemoteAPI(SubAPI):
                  cid: list = [],
                  status: list = ['pinned'],
                  force=False):
+        """
+        Remove pins from remote pinning service.
+
+        :param str service: Name of the remote pinning service to use
+        :param str name: Return pins with names that contain the value
+            provided (case-sensitive, exact match)
+        :param list cid: Return pins for the specified CIDs
+        :param list status: Return pins with the specified statuses
+            (queued,pinning,pinned,failed). Default: [pinned]
+        :param bool force: Allow removal of multiple pins matching the
+            query without additional confirmation. Default: false
+        """
         params = {
             'service': service,
             'status': status,
