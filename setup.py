@@ -44,12 +44,15 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Intended Audience :: Developers',
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Natural Language :: English',
         'Operating System :: OS Independent',
         'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',  # noqa
-        'Topic :: System :: Filesystems'
+        'Topic :: System :: Filesystems',
+        'Topic :: Communications :: File Sharing'
     ],
     keywords=[
         'asyncio',

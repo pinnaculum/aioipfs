@@ -85,7 +85,8 @@ class PinRemoteError(APIError):
             'empty response from remote pinning service'
         ) or message.startswith(
             'service endpoint must be a valid HTTP URL'
-        )
+        ) or 'ERROR_UNRECOGNISED_TOKEN' in message or \
+            "ERR_INVALID_TOKEN" in message
 
 
 class UnknownAPIError(APIError):

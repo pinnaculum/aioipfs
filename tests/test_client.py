@@ -625,8 +625,10 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason='This test relies on specific network conditions')
     @pytest.mark.parametrize('srvname', ['mysrv1'])
-    @pytest.mark.parametrize('srvendpoint', ['http://localhost:9580'])
+    @pytest.mark.parametrize('srvendpoint',
+                             ['https://api.estuary.tech/pinning'])
     async def test_pin_remote(self, event_loop, ipfsdaemon, iclient,
                               srvname, srvendpoint):
         res = await iclient.pin.remote.service.add(
@@ -643,7 +645,7 @@ class TestAsyncIPFS:
 
         entry = await iclient.core.add_bytes(b'ABCD')
 
-        # Try a remote pin (will fail, service does not exist)
+        # Try a remote pin (will fail, token does not exist)
         with pytest.raises(aioipfs.PinRemoteError):
             res = await iclient.pin.remote.add(
                 srvname,
