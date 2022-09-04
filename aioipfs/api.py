@@ -215,43 +215,42 @@ class BitswapAPI(SubAPI):
 
 
 class BlockAPI(SubAPI):
-    async def get(self, multihash):
+    async def get(self, cid):
         """
         Get a raw IPFS block.
 
-        :param str multihash: The base58 multihash of an existing block to get
+        :param str cid: The cid of an existing block to get
         :rtype: :py:class:`bytes`
         """
 
         return await self.fetch_raw(self.url('block/get'),
-                                    params={ARG_PARAM: multihash})
+                                    params={ARG_PARAM: cid})
 
-    async def rm(self, multihash, force=False, quiet=False):
+    async def rm(self, cid, force=False, quiet=False):
         """
         Remove IPFS block(s).
 
-        :param str multihash: The base58 multihash of an existing block to
-            remove
+        :param str cid: The cid of an existing block to remove
         :param bool force: Ignore nonexistent blocks
         :param bool quiet: Write minimal output
         """
 
         params = {
-            ARG_PARAM: multihash,
+            ARG_PARAM: cid,
             'force': boolarg(force),
             'quiet': boolarg(quiet),
         }
         return await self.fetch_json(self.url('block/rm'), params=params)
 
-    async def stat(self, multihash):
+    async def stat(self, cid):
         """
         Print information of a raw IPFS block.
 
-        :param str multihash: The base58 multihash of an existing block to stat
+        :param str cid: The cid of an existing block to stat
         """
 
         return await self.fetch_json(self.url('block/stat'),
-                                     params={ARG_PARAM: multihash})
+                                     params={ARG_PARAM: cid})
 
     async def put(self, filepath, cid_codec=None,
                   format='v0', mhtype='sha2-256', mhlen=-1,
@@ -442,12 +441,18 @@ class ConfigAPI(SubAPI):
 
 class DhtAPI(SubAPI):
     async def findpeer(self, peerid, verbose=False):
+        """
+        DEPRECATED: This command is deprecated
+        """
         return await self.fetch_json(
             self.url('dht/findpeer'),
             params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
         )
 
     async def findprovs(self, key, verbose=False, numproviders=20):
+        """
+        DEPRECATED: This command is deprecated
+        """
         params = {
             ARG_PARAM: key,
             'verbose': boolarg(verbose),
@@ -459,18 +464,27 @@ class DhtAPI(SubAPI):
             yield value
 
     async def get(self, peerid, verbose=False):
+        """
+        DEPRECATED: This command is deprecated
+        """
         return await self.fetch_json(
             self.url('dht/get'),
             params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
         )
 
     async def put(self, key, value):
+        """
+        DEPRECATED: This command is deprecated
+        """
         return await self.fetch_json(self.url('dht/put'),
                                      params=quote_args(key, value))
 
-    async def provide(self, multihash, verbose=False, recursive=False):
+    async def provide(self, cid, verbose=False, recursive=False):
+        """
+        DEPRECATED: This command is deprecated
+        """
         params = {
-            ARG_PARAM: multihash,
+            ARG_PARAM: cid,
             'verbose': boolarg(verbose),
             'recursive': boolarg(recursive)
         }
@@ -1146,9 +1160,9 @@ class RoutingAPI(SubAPI):
         return await self.fetch_json(self.url('routing/put'),
                                      params=quote_args(key, value))
 
-    async def provide(self, multihash, verbose=False, recursive=False):
+    async def provide(self, key, verbose=False, recursive=False):
         params = {
-            ARG_PARAM: multihash,
+            ARG_PARAM: key,
             'verbose': boolarg(verbose),
             'recursive': boolarg(recursive)
         }
@@ -1254,12 +1268,18 @@ class SwarmAPI(SubAPI):
 
 
 class TarAPI(SubAPI):
-    async def cat(self, multihash):
-        params = {ARG_PARAM: multihash}
+    async def cat(self, key):
+        """
+        DEPRECATED: This command is deprecated
+        """
+        params = {ARG_PARAM: key}
         return await self.fetch_raw(self.url('tar/cat'),
                                     params=params)
 
     async def add(self, tar):
+        """
+        DEPRECATED: This command is deprecated
+        """
         if not os.path.isfile(tar):
             raise Exception('TAR file does not exist')
 
@@ -1515,16 +1535,16 @@ class CoreAPI(SubAPI):
 
         return await self.fetch_json(self.url('id'), params=params)
 
-    async def cat(self, multihash, offset=None, length=None):
+    async def cat(self, path, offset=None, length=None):
         """
         Show IPFS object data.
 
-        :param str multihash: The base58 multihash of the object to retrieve
+        :param str path: The path of the IPFS object to retrieve
         :param int offset: byte offset to begin reading from
         :param int length: maximum number of bytes to read
         """
 
-        params = {ARG_PARAM: multihash}
+        params = {ARG_PARAM: path}
 
         if offset is not None and isinstance(offset, int):
             params['offset'] = offset
@@ -1555,14 +1575,14 @@ class CoreAPI(SubAPI):
             remove_archive()
             return True
 
-    async def get(self, multihash, dstdir='.', compress=False,
+    async def get(self, path, dstdir='.', compress=False,
                   compression_level=-1, archive=True, output=None,
                   progress_callback=None, progress_callback_arg=None,
                   chunk_size=16384):
         """
         Download IPFS objects.
 
-        :param str multihash: The base58 multihash of the object to retrieve
+        :param str path: The path of the IPFS object to retrieve
         :param str dstdir: destination directory, current directory by default
         :param bool compress: Compress the output with GZIP compression
         :param str compression_level: The level of compression (1-9)
@@ -1570,7 +1590,7 @@ class CoreAPI(SubAPI):
         """
 
         params = {
-            ARG_PARAM: multihash,
+            ARG_PARAM: path,
             'compress': boolarg(compress),
             'compression-level': str(compression_level),
             'archive': boolarg(archive)
@@ -1600,7 +1620,7 @@ class CoreAPI(SubAPI):
                     read_so_far += len(chunk)
 
                     if asyncio.iscoroutinefunction(progress_callback):
-                        await progress_callback(multihash, read_so_far,
+                        await progress_callback(path, read_so_far,
                                                 progress_callback_arg)
 
                     await fd.write(chunk)

@@ -117,8 +117,8 @@ Use :meth:`api.CoreAPI.cat` to get an object's raw data::
     
     bytes = await client.core.cat(multihash)
 
-Listing a path/multihash
-------------------------
+Listing a path or CID
+---------------------
 
 Use :meth:`api.CoreAPI.ls` for listing::
 
@@ -268,6 +268,13 @@ Repo API
 .. attribute:: aioipfs.AsyncIPFS.repo
 
     Gives access to the :class:`~api.RepoAPI` 
+
+Routing API
+===========
+
+.. attribute:: aioipfs.AsyncIPFS.routing
+
+    Gives access to the :class:`~api.RoutingAPI`
 
 Swarm API
 =========

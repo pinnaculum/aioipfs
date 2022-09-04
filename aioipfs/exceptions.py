@@ -83,6 +83,8 @@ class PinRemoteError(APIError):
         # TODO: match all types of remote pin errors
         return message.startswith(
             'empty response from remote pinning service'
+        ) or message.startswith(
+            'service endpoint must be a valid HTTP URL'
         )
 
 
