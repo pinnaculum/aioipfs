@@ -11,6 +11,8 @@ This library supports the
 `RPC API specifications <https://docs.ipfs.tech/reference/kubo/rpc>`_
 for kubo_ version *0.15.0*.
 
+See `the documentation here <https://aioipfs.readthedocs.io/en/latest>`_.
+
 .. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
     :target: https://github.com/pinnaculum/aioipfs
 
@@ -23,8 +25,8 @@ Installation
 
     pip install aioipfs
 
-Usage examples
-==============
+Usage
+=====
 
 Client instantiation
 --------------------
