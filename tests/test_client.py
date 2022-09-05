@@ -247,6 +247,20 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    async def test_swarm_peering(self, event_loop, ipfsdaemon, iclient):
+        info = await iclient.id()
+        reply = await iclient.swarm.peering.ls()
+        assert 'Peers' in reply
+
+        with pytest.raises(aioipfs.APIError):
+            await iclient.swarm.peering.add(info['ID'])
+
+        with pytest.raises(aioipfs.APIError):
+            await iclient.swarm.peering.rm('nothere')
+
+        await iclient.close()
+
+    @pytest.mark.asyncio
     async def test_refs(self, event_loop, ipfsdaemon, iclient,
                         testfile1):
         # TODO: proper refs test from an object

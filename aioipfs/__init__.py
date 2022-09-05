@@ -17,6 +17,7 @@ from aioipfs.apis import dag as dag_api
 from aioipfs.apis import pin as pin_api
 from aioipfs.apis import multibase as multibase_api
 from aioipfs.apis import pubsub as pubsub_api
+from aioipfs.apis import swarm as swarm_api
 
 
 RPC_API_DEFAULT_PORT = 5001
@@ -41,13 +42,15 @@ class AsyncIPFS(object):
     """
 
     def __init__(self,
-                 host='localhost',
-                 port=RPC_API_DEFAULT_PORT,
+                 host: str = 'localhost',
+                 port: int = RPC_API_DEFAULT_PORT,
                  maddr=None,
                  loop=None,
-                 conns_max=0, conns_max_per_host=0,
-                 read_timeout=0, api_version='v0',
-                 debug=False):
+                 conns_max: int = 0,
+                 conns_max_per_host: int = 0,
+                 read_timeout: int = 0,
+                 api_version: str = 'v0',
+                 debug: bool = False):
 
         self._conns_max = conns_max
         self._conns_max_per_host = conns_max_per_host
@@ -87,7 +90,7 @@ class AsyncIPFS(object):
         self.refs = api.RefsAPI(self)
         self.repo = api.RepoAPI(self)
         self.routing = api.RoutingAPI(self)
-        self.swarm = api.SwarmAPI(self)
+        self.swarm = swarm_api.SwarmAPI(self)
         self.tar = api.TarAPI(self)
         self.stats = api.StatsAPI(self)
 
@@ -240,12 +243,13 @@ class AsyncIPFS(object):
 
         return self.agent_version
 
-    async def agent_version_superioreq(self, version):
+    async def agent_version_superioreq(self, version: str):
         """
         Returns True if the node's agent version is superior or equal to
         version
 
-        :param str version: a go-ipfs version number e.g 0.4.10
+        :param str version: a kubo (formerly called go-ipfs)
+            version number e.g "0.14.0"
         """
         try:
             node_vs = await self.agent_version_get()

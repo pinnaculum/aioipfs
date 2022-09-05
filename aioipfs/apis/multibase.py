@@ -20,6 +20,8 @@ class MultibaseAPI(SubAPI):
     async def decode(self, filepath: str):
         """
         Decode multibase string
+
+        :param str filepath: Path to the file containing the data to encode
         """
 
         with multi.FormDataWriter() as mpwriter:
@@ -28,7 +30,8 @@ class MultibaseAPI(SubAPI):
             return await self.post(self.url('multibase/decode'),
                                    mpwriter, outformat='text')
 
-    async def encode_transcode(self, method, filepath: str, base='base64url'):
+    async def __encode_transcode(self, method: str,
+                                 filepath: str, base='base64url'):
         """
         Method used for encoding or transcoding
         """
@@ -44,7 +47,19 @@ class MultibaseAPI(SubAPI):
                                    mpwriter, params=params, outformat='text')
 
     async def encode(self, filepath: str, base='base64url'):
-        return await self.encode_transcode('encode', filepath, base=base)
+        """
+        Encode data into multibase string
+
+        :param str filepath: Path to the file containing the data to encode
+        :param str base: multibase encoding. Default: base64url
+        """
+        return await self.__encode_transcode('encode', filepath, base=base)
 
     async def transcode(self, filepath: str, base='base64url'):
-        return await self.encode_transcode('transcode', filepath, base=base)
+        """
+        Transcode multibase string between bases
+
+        :param str filepath: Path to the file containing the data to transcode
+        :param str base: multibase encoding. Default: base64url
+        """
+        return await self.__encode_transcode('transcode', filepath, base=base)

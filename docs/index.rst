@@ -10,13 +10,20 @@ aioipfs
 Asynchronous IPFS client API for Python3's asyncio.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 5
    :name: mastertoc
 
    api
 
 .. module:: aioipfs
 .. currentmodule:: aioipfs
+
+Installation
+============
+
+.. code-block:: shell
+
+    pip install aioipfs
 
 Async IPFS client
 =================
@@ -44,12 +51,6 @@ Maximum HTTP connections and read timeout parameters::
 
     client = aioipfs.AsyncIPFS(host='localhost', port=5008, read_timeout=30)
 
-The API is divided between the various IPFS subsystems, each subsystem has its
-own namespace/attribute inside the *AsyncIPFS* object, for example *client.pin*
-for the PIN api, *client.files* for the files/MFS API, etc ..
-
-All API functions will raise an :class:`~APIError` if there's an exception
-raised during the request.
 
 Async context manager
 ---------------------
@@ -66,6 +67,29 @@ Closing
 When finished you should always call :meth:`AsyncIPFS.close` on your client::
 
     await client.close()
+
+API sectioning
+==============
+
+The kubo_ (formerly called *go-ipfs*) RPC HTTP API provides many
+endpoints which allow to access the different subsystems of the IPFS
+daemon. You can read the 
+`RPC API specifications here <https://docs.ipfs.tech/reference/kubo/rpc>`_.
+
+**Important**: The **aioipfs** client API closely follows kubo_'s RPC
+endpoints path hierarchy, as each subsystem has its own
+namespace/attribute inside the *AsyncIPFS* client object, for example:
+
+- *client.core* for the :class:`~api.CoreAPI` 
+- *client.pin* for the :class:`~apis.pin.PinAPI`
+- *client.pin.remote* for the :class:`~apis.pin.PinRemoteAPI`
+- *client.files* for the :class:`~api.FilesAPI` 
+- *client.pubsub* for the :class:`~apis.pubsub.PubsubAPI` 
+
+etc ...  
+
+All API functions will raise an :class:`~aioipfs.exceptions.APIError`
+(or a more specific exception) if there's an error raised during the request.
 
 Core API
 ========
@@ -87,6 +111,8 @@ generator::
     async for added in client.core.add(['one', 'two', 'three'],
             wrap_with_directory=True):
         ...
+
+    cids = [entry['Hash'] async for entry in client.add(dir_path)]
 
 Entries yielded by the generator are as returned by the IPFS daemon,
 dictionaries with *Name*, *Hash* and *Size* keys.
@@ -121,7 +147,7 @@ Cat
 
 Use :meth:`api.CoreAPI.cat` to get an object's raw data::
     
-    bytes = await client.core.cat(multihash)
+    bytes = await client.core.cat(cid)
 
 Listing a path or CID
 ---------------------
@@ -137,53 +163,12 @@ Get IPFS node information::
 
     info = await client.core.id()
 
-Pin API
-=======
-
-.. attribute:: aioipfs.AsyncIPFS.pin
-
-    Gives access to the :class:`~apis.pin.PinAPI`
-
-Pinning a multihash or an IPFS path::
-
-    async for pinned in client.pin.add(multihash):
-        print('Pin progress', pinned['Progress'])
-
-Listing the pinned multihashes::
-
-    pinned = await client.pin.ls()
-
-Unpin with::
-
-    await client.pin.rm(path)
-
-P2P API
-=======
-
-.. attribute:: aioipfs.AsyncIPFS.p2p
-
-    Gives access to the :class:`~api.P2PAPI` 
-
 Block API
 =========
 
 .. attribute:: aioipfs.AsyncIPFS.block
 
     Gives access to the :class:`~api.BlockAPI` 
-
-Config API
-==========
-
-.. attribute:: aioipfs.AsyncIPFS.config
-
-    Gives access to the :class:`~api.ConfigAPI` 
-
-Pubsub API
-==========
-
-.. attribute:: aioipfs.AsyncIPFS.pubsub
-
-    Gives access to the :class:`~api.PubsubAPI` 
 
 Bitswap API
 ===========
@@ -199,6 +184,20 @@ Bootstrap API
 
     Gives access to the :class:`~api.BootstrapAPI` 
 
+Config API
+==========
+
+.. attribute:: aioipfs.AsyncIPFS.config
+
+    Gives access to the :class:`~api.ConfigAPI` 
+
+CID API
+=======
+
+.. attribute:: aioipfs.AsyncIPFS.cid
+
+    Gives access to the :class:`~api.CidAPI`
+
 DAG API
 =======
 
@@ -212,6 +211,20 @@ DHT API
 .. attribute:: aioipfs.AsyncIPFS.dht
 
     Gives access to the :class:`~api.DhtAPI` 
+
+Diag API
+========
+
+.. attribute:: aioipfs.AsyncIPFS.diag
+
+    Gives access to the :class:`~api.DiagAPI` 
+
+File API
+========
+
+.. attribute:: aioipfs.AsyncIPFS.file
+
+    Gives access to the :class:`~api.FileAPI` 
 
 Files API
 =========
@@ -227,8 +240,8 @@ Filestore API
 
     Gives access to the :class:`~api.FilestoreAPI` 
 
-Keys API
-========
+Key API
+=======
 
 .. attribute:: aioipfs.AsyncIPFS.key
 
@@ -247,6 +260,13 @@ Access the IPFS event log with::
     async for msg in client.log.tail():
         print(pprint.pprint(msg))
 
+Multibase API
+=============
+
+.. attribute:: aioipfs.AsyncIPFS.multibase
+
+    Gives access to the :class:`~apis.multibase.MultibaseAPI` 
+
 Name API
 ========
 
@@ -260,6 +280,47 @@ Object API
 .. attribute:: aioipfs.AsyncIPFS.object
 
     Gives access to the :class:`~api.ObjectAPI` 
+
+P2P API
+=======
+
+.. attribute:: aioipfs.AsyncIPFS.p2p
+
+    Gives access to the :class:`~api.P2PAPI` 
+
+Pin API
+=======
+
+.. attribute:: aioipfs.AsyncIPFS.pin
+
+    Gives access to the :class:`~apis.pin.PinAPI`
+
+Pinning a CID or an IPFS path::
+
+    async for pinned in client.pin.add(cid):
+        print('Pin progress', pinned['Progress'])
+
+Listing the pinned objects::
+
+    pinned = await client.pin.ls()
+
+Unpin with::
+
+    await client.pin.rm(path)
+
+Pin remote API
+==============
+
+.. attribute:: aioipfs.AsyncIPFS.pin.remote
+
+    Gives access to the :class:`~apis.pin.PinRemoteAPI`
+
+Pubsub API
+==========
+
+.. attribute:: aioipfs.AsyncIPFS.pubsub
+
+    Gives access to the :class:`~api.PubsubAPI` 
 
 Refs API
 ========
@@ -287,10 +348,17 @@ Swarm API
 
 .. attribute:: aioipfs.AsyncIPFS.swarm
 
-    Gives access to the :class:`~api.SwarmAPI` 
+    Gives access to the :class:`~apis.swarm.SwarmAPI` 
+
+Swarm Peering API
+=================
+
+.. attribute:: aioipfs.AsyncIPFS.swarm.peering
+
+    Gives access to the :class:`~apis.swarm.SwarmPeeringAPI` 
 
 TAR API
-=========
+=======
 
 .. attribute:: aioipfs.AsyncIPFS.tar
 

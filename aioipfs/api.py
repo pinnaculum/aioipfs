@@ -1134,12 +1134,25 @@ class RepoAPI(SubAPI):
 
 class RoutingAPI(SubAPI):
     async def findpeer(self, peerid, verbose=False):
+        """
+        Find the multiaddresses associated with a Peer ID.
+
+        :param str peerid: The ID of the peer to search for
+        :param bool verbose: Print extra information
+        """
         return await self.fetch_json(
             self.url('routing/findpeer'),
             params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
         )
 
     async def findprovs(self, key, verbose=False, numproviders=20):
+        """
+        Find peers that can provide a specific value, given a key.
+
+        :param str key: The key to find providers for
+        :param bool verbose: Print extra information
+        :param int numproviders: The number of providers to find. Default: 20
+        """
         params = {
             ARG_PARAM: key,
             'verbose': boolarg(verbose),
@@ -1151,16 +1164,36 @@ class RoutingAPI(SubAPI):
             yield value
 
     async def get(self, peerid, verbose=False):
+        """
+        Given a key, query the routing system for its best value.
+
+        :param str key: The key to find providers for
+        :param bool verbose: Print extra information
+        """
         return await self.fetch_json(
             self.url('routing/get'),
             params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}
         )
 
     async def put(self, key, value):
+        """
+        Write a key/value pair to the routing system.
+
+        :param str key: The key to store the value at
+        :param bool verbose: Print extra information
+        """
         return await self.fetch_json(self.url('routing/put'),
                                      params=quote_args(key, value))
 
     async def provide(self, key, verbose=False, recursive=False):
+        """
+        Announce to the network that you are providing given values.
+
+        :param str key: The key[s] to send provide records for
+        :param bool verbose: Print extra information
+        :param bool recursive: Recursively provide entire graph
+        """
+
         params = {
             ARG_PARAM: key,
             'verbose': boolarg(verbose),
@@ -1169,12 +1202,6 @@ class RoutingAPI(SubAPI):
 
         async for value in self.mjson_decode(
                 self.url('routing/provide'), params=params):
-            yield value
-
-    async def query(self, peerid, verbose=False):
-        async for value in self.mjson_decode(
-                self.url('dht/query'),
-                params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}):
             yield value
 
 
@@ -1201,70 +1228,6 @@ class StatsAPI(SubAPI):
 
     async def repo(self):
         return await self.fetch_json(self.url('stats/repo'))
-
-
-class SwarmAPI(SubAPI):
-    async def peers(self, verbose=True, streams=False, latency=False,
-                    direction=False):
-        params = {
-            'verbose': boolarg(verbose),
-            'streams': boolarg(streams),
-            'latency': boolarg(latency),
-            'direction': boolarg(direction)
-        }
-
-        return await self.fetch_json(self.url('swarm/peers'), params=params)
-
-    async def addrs(self):
-        return await self.fetch_json(self.url('swarm/addrs'))
-
-    async def addrs_local(self, id=False):
-        params = {'id': boolarg(id)}
-        return await self.fetch_json(self.url('swarm/addrs/local'),
-                                     params=params)
-
-    async def addrs_listen(self):
-        return await self.fetch_json(self.url('swarm/addrs/listen'))
-
-    async def connect(self, peer):
-        params = {ARG_PARAM: peer}
-        return await self.fetch_json(self.url('swarm/connect'),
-                                     params=params)
-
-    async def disconnect(self, peer):
-        params = {ARG_PARAM: peer}
-        return await self.fetch_json(self.url('swarm/disconnect'),
-                                     params=params)
-
-    async def filters_add(self, filter):
-        params = {ARG_PARAM: filter}
-        return await self.fetch_json(self.url('swarm/filters/add'),
-                                     params=params)
-
-    async def filters_rm(self, filter):
-        params = {ARG_PARAM: filter}
-        return await self.fetch_json(self.url('swarm/filters/rm'),
-                                     params=params)
-
-    async def limit(self, filepath, scope: str):
-        """
-        Get or set resource limits for a scope
-        """
-        params = {ARG_PARAM: scope}
-
-        with multi.FormDataWriter() as mpwriter:
-            mpwriter.append_payload(multi.bytes_payload_from_file(filepath))
-
-            return await self.post(self.url('swarm/limit'), mpwriter,
-                                   params=params, outformat='json')
-
-    async def stats(self, scope: str):
-        """
-        Report resource usage for a scope
-        """
-
-        return await self.fetch_json(self.url('swarm/stats'),
-                                     params={ARG_PARAM: scope})
 
 
 class TarAPI(SubAPI):

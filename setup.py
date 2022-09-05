@@ -37,7 +37,7 @@ setup(
     url='https://gitlab.com/cipres/aioipfs',
     description='Asynchronous IPFS client library',
     long_description=long_description,
-    packages=find_packages(),
+    packages=find_packages(exclude=['tests']),
     include_package_data=False,
     install_requires=install_reqs,
     classifiers=[
