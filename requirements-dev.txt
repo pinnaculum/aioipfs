@@ -3,5 +3,3 @@ pytest-asyncio
 tox
 flake8
 wheel
-sphinx
-sphinxcontrib-asyncio
