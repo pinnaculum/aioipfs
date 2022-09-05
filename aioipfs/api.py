@@ -384,7 +384,12 @@ class ConfigAPI(SubAPI):
                      boolean: bool = False,
                      json: bool = False):
         """
-        Get and set IPFS config values
+        Get or set IPFS config values
+
+        :param str key: The key of the config entry (e.g. "Addresses.API")
+        :param str value: The value to set the config entry to
+        :param bool boolean: Set a boolean value
+        :param bool json: Parse stringified JSON
         """
 
         params = {}
@@ -410,10 +415,10 @@ class ConfigAPI(SubAPI):
         return await self.fetch_json(self.url('config/show'))
 
     async def replace(self, configpath):
-        """ Replaces the IPFS configuration with new config file
+        """
+        Replaces the IPFS configuration with new config file
 
-        :param configpath: new configuration's file path
-        :type configpath: :py:class:`str`
+        :param str configpath: new configuration's file path
         """
         if not os.path.isfile(configpath):
             raise Exception('Config file {} does not exist'.format(configpath))
@@ -430,6 +435,10 @@ class ConfigAPI(SubAPI):
     async def profile_apply(self, profile, dry_run=False):
         """
         Apply profile to config
+
+        :param str profile: The profile to apply to the config
+        :param bool dry_run: print difference between the current config
+            and the config that would be generated
         """
         params = {
             ARG_PARAM: profile,
@@ -896,6 +905,28 @@ class NameAPI(SubAPI):
                       key='self', ttl=None,
                       quieter=False, allow_offline=False,
                       ipns_base: str = None):
+        """
+        Publish IPNS names
+
+        :param str path: ipfs path of the object to be published
+        :param bool resolve: Check if the given path can be resolved
+            before publishing
+        :param str lifetime: Time duration that the record will be
+            valid for.  This accepts durations such as "300s", "1.5h"
+            or "2h45m". Valid time units are "ns", "us" (or "µs"), "ms",
+            "s", "m", "h".
+        :param str key: Name of the key to be used or a valid PeerID,
+            as listed by 'ipfs key list -l'.
+        :param bool allow_offline: When offline, save the IPNS record to
+            the the local datastore without broadcasting to the network
+            instead of simply failing
+        :param str ttl: Time duration this record should be cached for.
+            Uses the same syntax as the lifetime option
+        :param bool quieter: Write only final hash
+        :param str ipns_base: Encoding used for keys: Can either be a
+            multibase encoded CID or a base58btc encoded multihash
+        """
+
         params = {
             ARG_PARAM: path,
             'resolve': boolarg(resolve),
@@ -915,6 +946,19 @@ class NameAPI(SubAPI):
 
     async def resolve(self, name=None, recursive=False, nocache=False,
                       dht_record_count=None, dht_timeout=None, stream=False):
+        """
+        Resolve IPNS names.
+
+        :param str name: The IPNS name to resolve. Defaults to your
+            node's peerID
+        :param bool recursive: Resolve until the result is not an IPNS name
+        :param bool nocache: Do not use cached entries
+        :param int dht_record_count: Number of records to request
+            for DHT resolution
+        :param int dht_timeout: Max time to collect values during DHT
+            resolution eg "30s". Pass 0 for no timeout
+        :param bool stream: Stream entries as they are found
+        """
         params = {
             'recursive': boolarg(recursive),
             'nocache': boolarg(nocache),
@@ -935,6 +979,10 @@ class NameAPI(SubAPI):
     async def resolve_stream(self, name=None, recursive=True, nocache=False,
                              dht_record_count=None, dht_timeout=None,
                              stream=True):
+        """
+        Resolve IPNS names, streaming entries as they're received
+        (async generator)
+        """
         params = {
             'recursive': boolarg(recursive),
             'nocache': boolarg(nocache),
@@ -1603,7 +1651,7 @@ class CoreAPI(SubAPI):
                      progress_callback=None, progress_callback_arg=None,
                      sleept=0.05, chunk_size=16384):
         """
-        Download IPFS objects.
+        Download IPFS objects (async generator)
 
         :param str objpath: The base58 objpath of the object to retrieve
         :param str dstdir: destination directory, current directory by default
@@ -1771,10 +1819,19 @@ class CoreAPI(SubAPI):
         }
         return await self.fetch_json(self.url('dns'), params=params)
 
-    async def resolve(self, name, recursive=False,
-                      dht_record_count=None, dht_timeout=None):
+    async def resolve(self, name,
+                      recursive: bool = False,
+                      dht_record_count: int = None,
+                      dht_timeout: int = None):
         """
         Resolve the value of names to IPFS
+
+        :param str name: The name to resolve
+        :param bool recursive: Resolve until the result is an IPFS name
+        :param int dht_record_count: Number of records to request
+            for DHT resolution
+        :param int dht_timeout: Max time to collect values during DHT
+            resolution eg "30s". Pass 0 for no timeout
         """
 
         params = {

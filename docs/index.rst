@@ -25,6 +25,12 @@ Installation
 
     pip install aioipfs
 
+If you want to use orjson_ to decode JSON messages:
+
+.. code-block:: shell
+
+    pip install 'aioipfs[orjson]'
+
 Async IPFS client
 =================
 
@@ -373,3 +379,4 @@ Indices and tables
 
 .. _multiaddr: https://multiformats.io/multiaddr/
 .. _kubo: https://github.com/ipfs/kubo
+.. _orjson: https://github.com/ijl/orjson

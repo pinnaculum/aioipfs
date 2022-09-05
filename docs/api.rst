@@ -14,8 +14,6 @@ aioipfs.api module
 
 .. automodule:: aioipfs.api
     :members:
-    :show-inheritance:
-    :private-members:
 
 aioipfs.apis.dag module
 -----------------------

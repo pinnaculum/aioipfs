@@ -1,7 +1,15 @@
-import orjson
+import json
 import sys
 
 from urllib.parse import quote
+
+try:
+    import orjson
+except ImportError:
+    have_orjson = False
+else:
+    have_orjson = True
+
 
 ARG_PARAM = 'arg'
 
@@ -42,14 +50,15 @@ def quote_dict(data):
         return quoted[1:]
 
 
-def decode_json(data):
-    if not data:
-        return None
+def decode_json(data: bytes):
     try:
-        json_obj = orjson.loads(data.decode())
+        if not isinstance(data, bytes):
+            raise TypeError('decode_json: invalid value type')
+
+        if have_orjson:
+            return orjson.loads(data.decode())
+        else:
+            return json.loads(data.decode())
     except Exception as exc:
-        print(data, file=sys.stderr)
         print('Could not read JSON object:', str(exc), file=sys.stderr)
         return None
-
-    return json_obj

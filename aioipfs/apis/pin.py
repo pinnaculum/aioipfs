@@ -148,6 +148,11 @@ class PinAPI(SubAPI):
     async def add(self, path, recursive=True, progress=True):
         """
         Pin objects to local storage.
+
+        :param str path: Path to object(s) to be pinned
+        :param bool recursive: Recursively pin the object linked to
+            by the specified object(s)
+        :param bool progress: Show progress
         """
 
         # We request progress status by default
@@ -165,6 +170,12 @@ class PinAPI(SubAPI):
                  stream: bool = False):
         """
         List objects pinned to local storage.
+
+        :param str path: Path of object(s) to be listed
+        :param str pintype: The type of pinned keys to list. Can be
+            "direct", "indirect", "recursive", or "all"
+        :param bool quiet: Write just hashes of objects
+        :param bool stream: Enable streaming of pins as they are discovered
         """
 
         params = {
@@ -181,6 +192,10 @@ class PinAPI(SubAPI):
     async def rm(self, path, recursive=True):
         """
         Remove pinned objects from local storage.
+
+        :param str path: Path of object(s) to be removed
+        :param bool recursive: Recursively unpin the object linked to
+            by the specified object(s)
         """
 
         params = {
@@ -193,6 +208,9 @@ class PinAPI(SubAPI):
     async def verify(self, verbose=False, quiet=True):
         """
         Verify that recursive pins are complete.
+
+        :param bool verbose: Also write the hashes of non-broken pins
+        :param bool quiet: Write just hashes of broken pins
         """
 
         params = {
@@ -207,7 +225,7 @@ class PinAPI(SubAPI):
         Update a recursive pin
 
         :param str old: Path to old object
-        :param str new: Path to new object
+        :param str new: Path to new object to be pinned
         :param bool unpin: Remove the old pin
         """
 

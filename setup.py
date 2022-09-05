@@ -40,6 +40,9 @@ setup(
     packages=find_packages(exclude=['tests']),
     include_package_data=False,
     install_requires=install_reqs,
+    extras_require={
+        'orjson': ['orjson>=3.0']
+    },
     classifiers=[
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.6',

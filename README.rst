@@ -25,6 +25,13 @@ Installation
 
     pip install aioipfs
 
+By default the *json* module from the standard Python library is used
+to decode JSON messages, but orjson_ will be used if installed:
+
+.. code-block:: shell
+
+    pip install 'aioipfs[orjson]'
+
 Usage
 =====
 
@@ -143,6 +150,7 @@ Requirements
 .. _yarl: https://pypi.python.org/pypi/yarl
 .. _IPFS: https://ipfs.io
 .. _kubo: https://github.com/ipfs/kubo
+.. _orjson: https://github.com/ijl/orjson
 
 License
 =======
