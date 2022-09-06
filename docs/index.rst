@@ -90,7 +90,7 @@ namespace/attribute inside the *AsyncIPFS* client object, for example:
 - *client.pin* for the :class:`~apis.pin.PinAPI`
 - *client.pin.remote* for the :class:`~apis.pin.PinRemoteAPI`
 - *client.files* for the :class:`~api.FilesAPI` 
-- *client.pubsub* for the :class:`~apis.pubsub.PubsubAPI` 
+- *client.pubsub* for the :class:`~apis.pubsub.PubSubAPI`
 
 etc ...  
 
@@ -326,7 +326,7 @@ Pubsub API
 
 .. attribute:: aioipfs.AsyncIPFS.pubsub
 
-    Gives access to the :class:`~api.PubsubAPI` 
+    Gives access to the :class:`~apis.pubsub.PubSubAPI`
 
 Refs API
 ========

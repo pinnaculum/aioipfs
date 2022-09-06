@@ -144,9 +144,9 @@ class PubSubAPI(SubAPI):
                 params=params):
             try:
                 if api_post011:
-                    converted = self.decode_message(message)
+                    converted = self._decode_message(message)
                 else:
-                    converted = self.decode_message_base58(message)
+                    converted = self._decode_message_base58(message)
             except Exception as e:
                 raise InvalidPubMessageError(
                     f'Could not decode pubsub message '
@@ -157,7 +157,7 @@ class PubSubAPI(SubAPI):
 
             await asyncio.sleep(0)
 
-    def decode_message(self, psmsg):
+    def _decode_message(self, psmsg):
         """
         Starting with go-ipfs v0.11, JSON fields in the pubsub messages
         are simply multibase-encoded (except the 'from' field which
@@ -174,7 +174,7 @@ class PubSubAPI(SubAPI):
                                 psmsg['topicIDs']]
         return conv_msg
 
-    def decode_message_base58(self, psmsg):
+    def _decode_message_base58(self, psmsg):
         """
         Convert a raw pubsub message (with base64-encoded fields) to a
         readable form
