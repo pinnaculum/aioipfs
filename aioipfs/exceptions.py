@@ -32,6 +32,12 @@ class APIError(Exception):
         return False
 
 
+class EndpointNotFoundError(APIError):
+    """
+    Exception for when a RPC endpoint is not found (HTTP 404)
+    """
+
+
 class NotPinnedError(APIError):
     """
     Content not pinned or pinned indirectly
@@ -95,3 +101,9 @@ class PinRemoteError(APIError):
 
 class UnknownAPIError(APIError):
     pass
+
+
+class InvalidPubMessageError(Exception):
+    """
+    Invalid pubsub message encoding error
+    """

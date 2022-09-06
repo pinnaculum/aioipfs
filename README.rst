@@ -9,7 +9,9 @@ Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*
 
 This library supports the
 `RPC API specifications <https://docs.ipfs.tech/reference/kubo/rpc>`_
-for kubo_ version *0.15.0*.
+for kubo_ version *0.15.0*. Unit tests are run against
+most major go-ipfs releases (go-ipfs>0.8.0) and all kubo_
+releases, see the *CI* section below.
 
 See `the documentation here <https://aioipfs.readthedocs.io/en/latest>`_.
 
@@ -123,6 +125,23 @@ Pubsub service
             async for message in cli.pubsub.sub(topic):
                 print('Received message from', message['from'])
                 await cli.pubsub.pub(topic, message['data'])
+
+CI
+==
+
+The Gitlab CI workflow runs unit tests against the following
+go-ipfs/kubo releases (`go here <https://gitlab.com/cipres/aioipfs/-/jobs>`_
+for the CI jobs overview).
+
+- go-ipfs 0.7.0
+- go-ipfs 0.8.0
+- go-ipfs 0.9.0
+- go-ipfs 0.10.0
+- go-ipfs 0.11.0
+- go-ipfs 0.12.0
+- go-ipfs 0.13.0
+- kubo 0.14.0
+- kubo 0.15.0
 
 Features
 ========

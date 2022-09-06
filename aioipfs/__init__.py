@@ -23,6 +23,10 @@ from aioipfs.apis import swarm as swarm_api
 RPC_API_DEFAULT_PORT = 5001
 
 
+class IpfsDaemonVersion(StrictVersion):
+    pass
+
+
 class AsyncIPFS(object):
     """
     Asynchronous IPFS API client
@@ -239,7 +243,11 @@ class AsyncIPFS(object):
                 comps = agent_version.rstrip('/').split('/')
 
                 if len(comps) >= 2:
-                    self._agent_version = comps[1]
+                    self._agent_version = IpfsDaemonVersion(
+                        re.sub(
+                            '(-.*$)', '', comps[1]
+                        )
+                    )
 
         return self.agent_version
 
@@ -253,15 +261,16 @@ class AsyncIPFS(object):
         """
         try:
             node_vs = await self.agent_version_get()
-            node_vs = re.sub('(-.*$)', '', node_vs)
-            version_node = StrictVersion(node_vs)
-            version_ref = StrictVersion(version)
-            return version_node >= version_ref
+            version_ref = IpfsDaemonVersion(version)
+            return node_vs >= version_ref
         except BaseException:
             return False
 
     async def agent_version_post0418(self):
         return await self.agent_version_superioreq('0.4.18')
+
+    async def agent_version_post011(self):
+        return await self.agent_version_superioreq('0.11.0')
 
     def get_session(self, conn_timeout=60.0 * 30, read_timeout=60.0 * 10):
         return aiohttp.ClientSession(

@@ -55,6 +55,13 @@ class SubAPI(object):
         When the daemon returns an HTTP status code != 200, this
         method is called to raise an API exception.
         """
+
+        if response.status == HTTPNotFound.status_code:
+            # 404
+            raise EndpointNotFoundError(
+                f'Endpoint for URL: {response.url} NOT FOUND'
+            )
+
         msg, code = self.decode_error(data)
 
         if isinstance(msg, str) and code is not None:

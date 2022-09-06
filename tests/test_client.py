@@ -8,6 +8,7 @@ import subprocess
 import os
 import os.path
 import json
+
 from pathlib import Path
 from multiaddr import Multiaddr
 
@@ -248,6 +249,11 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_swarm_peering(self, event_loop, ipfsdaemon, iclient):
+        if await iclient.agent_version_get() < \
+                aioipfs.IpfsDaemonVersion('0.12.0'):
+            # Unavailable for these versions
+            pytest.skip('RPC endpoints not available')
+
         info = await iclient.id()
         reply = await iclient.swarm.peering.ls()
         assert 'Peers' in reply
@@ -464,6 +470,16 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     async def test_multibase(self, event_loop, ipfsdaemon, iclient,
                              tmpdir, testfile1):
+        if await iclient.agent_version_get() < \
+                aioipfs.IpfsDaemonVersion('0.10.0'):
+            # the /multibase  endpoints were introduced some time around
+            # v0.10.x or v0.11x, don't test this API in that case
+
+            with pytest.raises(aioipfs.EndpointNotFoundError):
+                await iclient.multibase.list()
+
+            pytest.skip('RPC endpoints not available')
+
         reply = await iclient.multibase.list()
         assert isinstance(reply, list)
         assert len(reply) > 0
@@ -482,7 +498,10 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('topic', ['aioipfs.pytest'])
-    @pytest.mark.parametrize('msgdata', ['test'])
+    @pytest.mark.parametrize('msgdata', ['test',
+                                         b'amazing',
+                                         None,
+                                         1234])
     async def test_pubsub(self, event_loop, ipfsdaemon, iclient,
                           topic, msgdata):
         # Listen on a pubsub topic and send a single message, checking that
@@ -490,15 +509,25 @@ class TestAsyncIPFS:
 
         info = await iclient.id()
 
-        await iclient.pubsub.ls()
         await iclient.pubsub.peers()
 
         async def subtask():
             try:
                 async for message in iclient.pubsub.sub(topic):
-                    assert message['from'] == info['ID']
+                    if isinstance(message['from'], bytes):
+                        # Old base58 messages: from is bytes
+                        assert message['from'].decode() == info['ID']
+                    elif isinstance(message['from'], str):
+                        assert message['from'] == info['ID']
+                    else:
+                        raise Exception('PS from value is invalid')
+
                     assert message['topicIDs'] == [topic]
-                    assert message['data'].decode() == msgdata
+
+                    if isinstance(msgdata, bytes):
+                        assert message['data'].decode() == msgdata.decode()
+                    else:
+                        assert message['data'].decode() == msgdata
             except AssertionError as err:
                 print(f'Pubsub message assert error: {err}')
                 return False
@@ -507,9 +536,24 @@ class TestAsyncIPFS:
 
             return False
 
+        if type(msgdata) not in [bytes, str]:
+            with pytest.raises(ValueError):
+                await iclient.pubsub.pub(topic, msgdata)
+
+            pytest.skip(
+                f'Skipping complete message pubsub test for invalid '
+                f'message type: {type(msgdata)}'
+            )
+
         t = asyncio.ensure_future(subtask())
 
         await asyncio.sleep(2)
+
+        topics = (await iclient.pubsub.ls())['Strings']
+        assert topic in topics  # should always work, as topics are decoded
+        peers = await iclient.pubsub.peers()
+        assert 'Strings' in peers
+
         await iclient.pubsub.pub(topic, msgdata)
         await asyncio.sleep(1)
 
@@ -521,6 +565,13 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_routing(self, event_loop, ipfsdaemon, iclient):
+        if await iclient.agent_version_get() < \
+                aioipfs.IpfsDaemonVersion('0.14.0'):
+            with pytest.raises(aioipfs.EndpointNotFoundError):
+                await iclient.routing.get('whoknows')
+
+            pytest.skip('RPC endpoints not available')
+
         reply = await iclient.add_bytes(b'ABCD', cid_version=1,
                                         hash='sha2-256')
         provs = [p async for p in iclient.routing.findprovs(reply['Hash'])]

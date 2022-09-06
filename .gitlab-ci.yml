@@ -3,9 +3,51 @@ image: "registry.gitlab.com/cipres/ipfs-void-storm:latest"
 stages:
   - build
 
+variables:
+  PATH: "/opt/ipfs/bin:/usr/bin:/bin:/sbin"
+
 build:
   stage: build
+  parallel:
+    matrix:
+      # This is the list of go-ipfs/kubo versions we run
+      # unit tests against
+
+      - IPFSD_RELEASE_VERSION: [
+          go-ipfs-0.8.0,
+          go-ipfs-0.9.0,
+          go-ipfs-0.10.0,
+          go-ipfs-0.11.0,
+          go-ipfs-0.12.0,
+          go-ipfs-0.13.0,
+          kubo-0.14.0,
+          kubo-0.15.0
+        ]
+
   script:
+    - mkdir -p /opt/ipfs/bin
+
+    - |-
+      # Match go-ipfs version number
+      if [[ "$IPFSD_RELEASE_VERSION" =~ go-ipfs-([0-9].[0-9]+.[0-9]+) ]]; then
+        VER="${BASH_REMATCH[1]}"
+
+        curl -o go-ipfs.tar.gz \
+          https://dist.ipfs.tech/go-ipfs/v${VER}/go-ipfs_v${VER}_linux-amd64.tar.gz
+        tar -xvf go-ipfs.tar.gz && cp go-ipfs/ipfs /opt/ipfs/bin
+      fi
+
+      # Match kubo version number (will work with x.xx.xx)
+      if [[ "$IPFSD_RELEASE_VERSION" =~ kubo-([0-9].[0-9]+.[0-9]+) ]]; then
+        VER="${BASH_REMATCH[1]}"
+
+        curl -o kubo.tar.gz \
+          https://dist.ipfs.tech/kubo/v${VER}/kubo_v${VER}_linux-amd64.tar.gz
+        tar -xvf kubo.tar.gz && cp kubo/ipfs /opt/ipfs/bin
+      fi
+
+    - ipfs version
+
     - python3 -m pip install --upgrade pip
     - python3 -m venv venv
 
