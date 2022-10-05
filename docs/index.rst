@@ -123,6 +123,13 @@ generator::
 Entries yielded by the generator are as returned by the IPFS daemon,
 dictionaries with *Name*, *Hash* and *Size* keys.
 
+Since kubo *v0.16.0*, you can import content and link the resulting
+object in the MFS in the same RPC call, by using the *to_files*
+string argument, which should the path in the MFS for the link::
+
+    async for added in client.core.add('file1.txt', to_files='/file1.txt'):
+        print(added['Hash'])
+
 Adding bytes
 ------------
 
@@ -131,12 +138,16 @@ Add some bytes with :meth:`api.CoreAPI.add_bytes`::
     >>> entry = await client.core.add_bytes(b'ABCD')
     {'Name': 'QmZ655k2oftYnsocBxqTWzDer3GNui2XQTtcA4ZUbhpz5N', 'Hash': 'QmZ655k2oftYnsocBxqTWzDer3GNui2XQTtcA4ZUbhpz5N', 'Size': '12'}
 
+    entry = await client.core.add_bytes('ABCD', to_files='/abcd')
+
 Adding string data
 ------------------
 
 Add a UTF-8 string with :meth:`api.CoreAPI.add_str`::
 
     entry = await client.core.add_str('ABCD')
+
+    entry = await client.core.add_str('ABCD', to_files='/abcd')
 
 Getting IPFS objects
 --------------------

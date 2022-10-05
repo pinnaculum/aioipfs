@@ -9,7 +9,7 @@ Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*
 
 This library supports the
 `RPC API specifications <https://docs.ipfs.tech/reference/kubo/rpc>`_
-for kubo_ version *0.15.0*. Unit tests are run against
+for kubo_ version *0.16.0*. Unit tests are run against
 most major go-ipfs releases (go-ipfs>0.8.0) and all kubo_
 releases, see the *CI* section below.
 
@@ -75,9 +75,10 @@ Get an IPFS resource
 
     import aioipfs
 
-    async def get(ipfshash):
+    async def get(cid: str):
         client = aioipfs.AsyncIPFS()
-        await client.get(ipfshash, dstdir='.')
+
+        await client.get(cid, dstdir='.')
         await client.close()
 
     loop = asyncio.get_event_loop()
@@ -97,7 +98,7 @@ therefore should be used with the *async for* syntax.
 
     import aioipfs
 
-    async def add_files(files):
+    async def add_files(files: list):
         client = aioipfs.AsyncIPFS()
 
         async for added_file in client.add(*files, recursive=True):
@@ -120,10 +121,11 @@ Pubsub service
 
 .. code-block:: python
 
-    async def pubsub_serve(topic):
+    async def pubsub_serve(topic: str):
         async with aioipfs.AsyncIPFS() as cli:
             async for message in cli.pubsub.sub(topic):
                 print('Received message from', message['from'])
+
                 await cli.pubsub.pub(topic, message['data'])
 
 CI
@@ -142,6 +144,7 @@ for the CI jobs overview).
 - go-ipfs 0.13.0
 - kubo 0.14.0
 - kubo 0.15.0
+- kubo 0.16.0
 
 Features
 ========

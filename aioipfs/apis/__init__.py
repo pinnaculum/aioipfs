@@ -187,17 +187,24 @@ class SubAPI(object):
                             yield message
 
                     await asyncio.sleep(0)
-        except asyncio.CancelledError as err:
+        except (asyncio.CancelledError,
+                asyncio.TimeoutError) as err:
             if new_session is True:
                 await session.close()
 
             raise err
         except APIError as e:
+            if new_session is True:
+                await session.close()
+
             raise e
         except (ClientPayloadError,
                 ClientConnectorError,
                 ServerDisconnectedError,
                 Exception):
+            if new_session is True:
+                await session.close()
+
             raise IPFSConnectionError('Connection/payload error')
 
         if new_session is True:

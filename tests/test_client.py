@@ -50,8 +50,7 @@ def testfile1(tmpdir):
 def testfile2(tmpdir):
     r = random.Random()
     filep = tmpdir.join('testfile2.txt')
-    for i in range(0, 128):
-        filep.write(str(r.randint(i, i * 2)))
+    filep.write(''.join([str(r.randint(i, i * 2)) for i in range(0, 16)]))
     return filep
 
 
@@ -303,6 +302,29 @@ class TestAsyncIPFS:
             count += 1
 
         assert count == 2
+
+        # Test the new --to-files argument introduced by
+        # kubo v0.16.0, which allows to link the
+        # imported file in the MFS space in the same RPC call
+
+        if await iclient.agent_version_get() >= \
+                aioipfs.IpfsDaemonVersion('0.16.0'):
+            async for added in iclient.add(str(testfile2),
+                                           to_files='/mfsref'):
+                assert 'Hash' in added
+
+            content = await iclient.files.read('/mfsref')
+            assert content.decode() == testfile2.read()
+
+            # This fails, as --to-files requires a MFS path starting with /
+            await iclient.add_str('invalid', to_files='noslash')
+            with pytest.raises(aioipfs.APIError):
+                await iclient.files.read('/noslash')
+
+            # Valid MFS path
+            await iclient.add_str('test', to_files='/wslash')
+            assert (await iclient.files.read('/wslash')).decode() == 'test'
+
         await iclient.close()
 
     @pytest.mark.asyncio

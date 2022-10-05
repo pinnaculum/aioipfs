@@ -1340,6 +1340,10 @@ class CoreAPI(SubAPI):
         if isinstance(hashfn, str):
             params['hash'] = hashfn
 
+        to_files = kwargs.pop('to_files', None)
+        if isinstance(to_files, str) and to_files.startswith('/'):
+            params['to-files'] = to_files
+
         inline = kwargs.pop('inline', False)
         if inline is True:
             params['inline'] = boolarg(inline)
@@ -1429,6 +1433,8 @@ class CoreAPI(SubAPI):
             recursive add.
         :param bool inline: Inline small blocks into CIDs
         :param str hash: Hash function to use
+        :param str to_files: Add reference to a file inside the (MFS) at the
+            provided path
         :param int inline_limit: Maximum block size to inline
         :param int cid_version: CID version
         """
