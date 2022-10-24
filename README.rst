@@ -128,6 +128,19 @@ Pubsub service
 
                 await cli.pubsub.pub(topic, message['data'])
 
+
+Dialing a P2P service
+---------------------
+
+.. code-block:: python
+
+    async with aioipfs.AsyncIPFS() as client:
+        async with client.p2p.dial_service(peer_id, '/x/echo') as dial:
+            print(f'Dial host: {dial.maddr_host}, port: {dial.maddr_port}')
+
+            # Connect to the service now
+            ....
+
 CI
 ==
 

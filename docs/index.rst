@@ -10,7 +10,7 @@ aioipfs
 Asynchronous IPFS client API for Python3's asyncio.
 
 .. toctree::
-   :maxdepth: 5
+   :maxdepth: 2
    :name: mastertoc
 
    api
@@ -123,9 +123,9 @@ generator::
 Entries yielded by the generator are as returned by the IPFS daemon,
 dictionaries with *Name*, *Hash* and *Size* keys.
 
-Since kubo *v0.16.0*, you can import content and link the resulting
-object in the MFS in the same RPC call, by using the *to_files*
-string argument, which should the path in the MFS for the link::
+Since kubo *v0.16.0*, you can import a file and link the resulting
+object inside the MFS in the same RPC call, by using the *to_files*
+string argument, which should be the path in the MFS for the link::
 
     async for added in client.core.add('file1.txt', to_files='/file1.txt'):
         print(added['Hash'])
@@ -304,6 +304,31 @@ P2P API
 .. attribute:: aioipfs.AsyncIPFS.p2p
 
     Gives access to the :class:`~api.P2PAPI` 
+
+There's an API to easily dial a P2P service through an async
+context manager::
+
+    async with client.p2p.dial_service(
+        '12D3KooWRd9Pt1Fri5F4W32uhGm8fBG4pvxEiFwgMru85zmajxcd',
+        '/x/myservice') as ctx:
+        if ctx.failed:
+            # Dialing failed
+            raise Exception('....')
+
+        # The multiaddr is available as 'ctx.maddr'
+        print(f'Multiaddr': {ctx.maddr}')
+
+        # The host/port can be retrieved via maddr_host and maddr_port
+        print(f'Host: {ctx.maddr_host}, port: {ctx.maddr_port}')
+
+Example of dialing a remote http service (using *ctx.httpUrl()*)::
+
+    async with client.p2p.dial_service(
+        '12D3KooWRd9Pt1Fri5F4W32uhGm8fBG4pvxEiFwgMru85zmajxcd',
+        '/x/http1') as ctx:
+        async with aiohttp.ClientSession() as sess:
+            async with sess.get(ctx.httpUrl('/')) as resp:
+                print(await resp.read())
 
 Pin API
 =======

@@ -633,6 +633,20 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize('protocol', ['/x/test'])
+    @pytest.mark.parametrize('address', ['/ip4/127.0.0.1/tcp/10000'])
+    async def test_p2p_dial(self, event_loop, ipfsdaemon, iclient,
+                            protocol, address):
+        nid = (await iclient.core.id())['ID']
+        await iclient.p2p.listen(protocol, address)
+
+        async with iclient.p2p.dial_service(nid, protocol,
+                                            allow_loopback=True) as ctx:
+            assert ctx.maddr == Multiaddr(address)
+
+        await iclient.close()
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize('keysize', [2048, 4096])
     async def test_keys(self, event_loop, ipfsdaemon, iclient,
                         keysize, datafiles):

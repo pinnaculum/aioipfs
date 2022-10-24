@@ -1,5 +1,12 @@
+import functools
 import json
+import re
 import sys
+from multiaddr import Multiaddr
+from distutils.version import StrictVersion
+from contextlib import closing
+import socket
+import os.path
 
 from urllib.parse import quote
 
@@ -61,4 +68,98 @@ def decode_json(data: bytes):
             return json.loads(data.decode())
     except Exception as exc:
         print('Could not read JSON object:', str(exc), file=sys.stderr)
+        return None
+
+
+def async_enterable(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        class AsyncEnterableInstance:
+            async def __aenter__(self):
+                self.context = await f(*args, **kwargs)
+                return await self.context.__aenter__()
+
+            async def __aexit__(self, *args, **kwargs):
+                await self.context.__aexit__(*args, **kwargs)
+
+            def __await__(self):
+                return f(*args, **kwargs).__await__()
+
+        return AsyncEnterableInstance()
+
+    return wrapper
+
+
+def maddr_tcp_explode(multi: Multiaddr) -> tuple:
+    host, port = None, 0
+
+    for proto in multi.protocols():
+        if proto.name in ['ip4', 'ip6', 'dns4', 'dns6']:
+            host = multi.value_for_protocol(proto.code)
+        if proto.name == 'tcp':
+            port = int(multi.value_for_protocol(proto.code))
+
+    return host, port
+
+
+def unusedTcpPort():
+    try:
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            s.bind(('', 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            return s.getsockname()[1]
+    except Exception:
+        return None
+
+
+def p2p_addr_explode(addr: str) -> tuple:
+    """
+    Explode a P2P service endpoint address such as :
+
+    /p2p/12D3KooWD3bfmNbuuuVCYwkjnFt3ukm3qaB3hDED3peHHXawvRAi/x/videocall/room1/1.0.0
+    /p2p/12D3KooWD3bfmNbuuuVCYwkjnFt3ukm3qaB3hDED3peHHXawvRAi/x/test
+
+    into its components, returning a tuple in the form
+
+    (peerId, protoFull, protoVersion)
+
+    protoFull can be passed to 'ipfs p2p dial'
+    """
+
+    peerIdRe = re.compile(r'([\w]){46,59}$')
+
+    parts = addr.lstrip(os.path.sep).split(os.path.sep)
+    try:
+        assert parts.pop(0) == 'p2p'
+        peerId = parts.pop(0)
+        prefix = parts.pop(0)
+        assert peerIdRe.match(peerId)
+        assert prefix in ['x', 'y', 'z']
+
+        pVersion = None
+        protoA = [prefix]
+        protoPart = parts.pop(0)
+        protoA.append(protoPart)
+
+        while protoPart:
+            try:
+                protoPart = parts.pop(0)
+            except IndexError:
+                break
+
+            protoA.append(protoPart)
+
+            try:
+                v = StrictVersion(protoPart)
+            except Exception:
+                # No version
+                pass
+            else:
+                # Found a version, should be last element
+                pVersion = v
+                assert len(parts) == 0
+                break
+
+        return peerId, os.path.sep + os.path.join(*protoA), pVersion
+    except Exception:
         return None

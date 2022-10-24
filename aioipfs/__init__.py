@@ -1,11 +1,13 @@
-__version__ = '0.5.8'
+__version__ = '0.5.9'
 
 from yarl import URL
 from distutils.version import StrictVersion
 
 import asyncio
 import aiohttp
+import ipaddress
 import re
+import socket
 
 from multiaddr import Multiaddr
 from multiaddr.exceptions import ParseError
@@ -16,8 +18,10 @@ from aioipfs.exceptions import *  # noqa
 from aioipfs.apis import dag as dag_api
 from aioipfs.apis import pin as pin_api
 from aioipfs.apis import multibase as multibase_api
+from aioipfs.apis import p2p as p2p_api
 from aioipfs.apis import pubsub as pubsub_api
 from aioipfs.apis import swarm as swarm_api
+from aioipfs.helpers import unusedTcpPort
 
 
 RPC_API_DEFAULT_PORT = 5001
@@ -72,7 +76,7 @@ class AsyncIPFS(object):
 
         # Install the API handlers
         self.core = api.CoreAPI(self)
-        self.p2p = api.P2PAPI(self)
+        self.p2p = p2p_api.P2PAPI(self)
         self.block = api.BlockAPI(self)
         self.pubsub = pubsub_api.PubSubAPI(self)
         self.bitswap = api.BitswapAPI(self)
@@ -115,6 +119,14 @@ class AsyncIPFS(object):
     @property
     def host(self):
         return self._host
+
+    @property
+    def host_local(self):
+        try:
+            addr = ipaddress.ip_address(self._host)
+            return addr.is_loopback
+        except Exception:
+            return self._host in ['localhost', socket.gethostname()]
 
     @property
     def port(self):
@@ -283,6 +295,22 @@ class AsyncIPFS(object):
                 sock_read=read_timeout
             )
         )
+
+    def allocate_tcp_maddr(self) -> Multiaddr:
+        """
+        Find an unused TCP port on this host and return the multiaddr for it.
+
+        :rtype: Multiaddr
+        """
+
+        port = unusedTcpPort()
+
+        try:
+            ip = ipaddress.ip_address(self.host)
+            return Multiaddr(f'/ip{ip.version}/{self.host}/tcp/{port}')
+        except Exception:
+            # Shouldn't assume dns4 here
+            return Multiaddr(f'/dns4/{self.host}/tcp/{port}')
 
     async def __aenter__(self):
         return self

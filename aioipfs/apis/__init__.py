@@ -24,7 +24,7 @@ HTTP_ERROR_CODES = [
 ]
 
 
-class SubAPI(object):
+class SubAPI:
     """
     Master class for all classes implementing API functions
 

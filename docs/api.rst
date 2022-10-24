@@ -33,6 +33,12 @@ aioipfs.apis.pin module
 .. automodule:: aioipfs.apis.pin
     :members:
 
+aioipfs.apis.p2p module
+-----------------------
+
+.. automodule:: aioipfs.apis.p2p
+    :members:
+
 aioipfs.apis.pubsub module
 --------------------------
 
