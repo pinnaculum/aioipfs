@@ -39,16 +39,25 @@ class TunnelDialerContext:
 
     @property
     def maddr_port(self):
+        """
+        The connection TCP port
+        """
         if self.maddr:
             return maddr_tcp_explode(self.maddr)[1]
 
     @property
     def maddr_host(self):
+        """
+        The connection hostname/ip
+        """
         if self.maddr:
             return maddr_tcp_explode(self.maddr)[0]
 
     @property
     def failed(self):
+        """
+        Returns True if the service dial has failed
+        """
         return self.maddr is None
 
     def httpUrl(self,
@@ -109,7 +118,7 @@ class P2PDialerMixin:
 
         Returns an async context manager:
 
-        async with client.p2p.dial_proto(...) as ctx:
+        async with client.p2p.dial_service(...) as ctx:
             print(ctx.maddr_host, ctx.maddr_port)
 
         :param str peer: Peer ID
@@ -210,27 +219,27 @@ class P2PDialerMixin:
 
         return TunnelDialerContext(self.driver, peer, proto, maddr)
 
-    async def streams_for_proto(self, protocol: str):
+    async def streams_for_proto(self, protocol: str) -> list:
         return [stream for stream in await self.streams() if
                 stream['Protocol'] == protocol]
 
-    async def streams_for_targetaddr(self, addr: Multiaddr):
+    async def streams_for_targetaddr(self, addr: Multiaddr) -> list:
         return [stream for stream in await self.streams() if
                 stream['TargetAddress'] == str(addr)]
 
-    async def listeners_for_targetaddr(self, addr: Multiaddr):
+    async def listeners_for_targetaddr(self, addr: Multiaddr) -> list:
         return [stream for stream in await self.listeners() if
                 stream['TargetAddress'] == str(addr)]
 
-    async def listeners_for_listenaddr(self, addr: Multiaddr):
+    async def listeners_for_listenaddr(self, addr: Multiaddr) -> list:
         return [stream for stream in await self.listeners() if
                 stream['ListenAddress'] == str(addr)]
 
-    async def listeners_for_proto(self, protocol: str):
+    async def listeners_for_proto(self, protocol: str) -> list:
         return [stream for stream in await self.listeners() if
                 stream['Protocol'] == protocol]
 
-    async def listeners(self):
+    async def listeners(self) -> list:
         try:
             resp = await self.ls(headers=True)
             assert isinstance(resp, dict)
@@ -238,7 +247,7 @@ class P2PDialerMixin:
         except (AssertionError, APIError):
             return []
 
-    async def streams(self):
+    async def streams(self) -> list:
         try:
             resp = await self.stream_ls(headers=True)
             assert isinstance(resp, dict)

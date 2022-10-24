@@ -303,7 +303,7 @@ P2P API
 
 .. attribute:: aioipfs.AsyncIPFS.p2p
 
-    Gives access to the :class:`~api.P2PAPI` 
+    Gives access to the :class:`~apis.p2p.P2PAPI` 
 
 There's an API to easily dial a P2P service through an async
 context manager::
