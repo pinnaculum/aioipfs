@@ -10,6 +10,11 @@ import os.path
 
 from urllib.parse import quote
 
+from cid import make_cid
+from cid import CIDv1
+from cid import CIDv0
+
+
 try:
     import orjson
 except ImportError:
@@ -163,3 +168,43 @@ def p2p_addr_explode(addr: str) -> tuple:
         return peerId, os.path.sep + os.path.join(*protoA), pVersion
     except Exception:
         return None
+
+
+def peerid_reencode(peerId: str,
+                    base: str = 'base36',
+                    multicodec: str = 'libp2p-key') -> str:
+    """
+    Encode a PeerId to a specific base
+    """
+
+    cid = make_cid(peerId)
+    if not cid:
+        return None
+
+    if base in ['base32', 'base36']:
+        return CIDv1(multicodec, cid.multihash).encode(base).decode()
+    elif base in ['base58']:
+        return str(CIDv0(cid.multihash))
+
+    return None
+
+
+def peerid_base32(peerId: str) -> str:
+    """
+    Convert any PeerId to a CIDv1 (base32)
+    """
+    return peerid_reencode(peerId, base='base32')
+
+
+def peerid_base36(peerId: str) -> str:
+    """
+    Convert any PeerId to a CIDv1 (base36)
+    """
+    return peerid_reencode(peerId, base='base36')
+
+
+def peerid_base58(peerId: str) -> str:
+    """
+    Convert any PeerId to a CIDv0
+    """
+    return peerid_reencode(peerId, base='base58')

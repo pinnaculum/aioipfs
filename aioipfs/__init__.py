@@ -316,4 +316,4 @@ class AsyncIPFS(object):
         return self
 
     async def __aexit__(self, *args):
-        return
+        await self.close()
