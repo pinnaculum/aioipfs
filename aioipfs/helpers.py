@@ -10,9 +10,9 @@ import os.path
 
 from urllib.parse import quote
 
-from cid import make_cid
-from cid import CIDv1
-from cid import CIDv0
+from multiformats_cid import make_cid
+from multiformats_cid import CIDv1
+from multiformats_cid import CIDv0
 
 
 try:
