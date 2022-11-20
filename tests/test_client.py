@@ -181,8 +181,25 @@ class TestClientConstructor:
         with pytest.raises(aioipfs.InvalidNodeAddressError):
             aioipfs.AsyncIPFS(maddr='/ip4/127.0.0.1/udp/4000', loop=event_loop)
 
+        # Invalid application layer protocol
+        with pytest.raises(aioipfs.InvalidNodeAddressError):
+            aioipfs.AsyncIPFS(maddr='/ip4/localhost/tcp/4000/invalid', loop=event_loop)
+
     @pytest.mark.asyncio
     async def test_constructor_apiurl(self, event_loop, ipfsdaemon):
+
+        # Test by passing a host and port
+        client = aioipfs.AsyncIPFS(
+            host='localhost', port=apiport, loop=event_loop)
+
+        assert str(client.api_url) == f'http://localhost:{apiport}/api/v0/'
+
+        # Test by passing a host, port and scheme
+        client = aioipfs.AsyncIPFS(
+            host='localhost', port=apiport, scheme='https', loop=event_loop)
+
+        assert str(client.api_url) == f'https://localhost:{apiport}/api/v0/'
+
         # Test by passing a valid /ip4/x.x.x.x/tcp/port multiaddr
         client = aioipfs.AsyncIPFS(
             maddr=f'/ip4/127.0.0.1/tcp/{apiport}', loop=event_loop)
@@ -200,6 +217,12 @@ class TestClientConstructor:
             maddr=f'/dns6/example.com/tcp/{apiport}'
         )
         assert str(client.api_url) == f'http://example.com:{apiport}/api/v0/'
+
+        # Test by passing a valid HTTPS multiaddr
+        client = aioipfs.AsyncIPFS(
+            maddr=f'/dns4/localhost/tcp/{apiport}/https', loop=event_loop)
+
+        assert str(client.api_url) == f'https://localhost:{apiport}/api/v0/'
 
         # Test by passing a valid /ip6/.../tcp/port multiaddr
         client = aioipfs.AsyncIPFS(
