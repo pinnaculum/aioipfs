@@ -183,7 +183,8 @@ class TestClientConstructor:
 
         # Invalid application layer protocol
         with pytest.raises(aioipfs.InvalidNodeAddressError):
-            aioipfs.AsyncIPFS(maddr='/ip4/localhost/tcp/4000/invalid', loop=event_loop)
+            aioipfs.AsyncIPFS(maddr='/ip4/localhost/tcp/4000/invalid',
+                              loop=event_loop)
 
     @pytest.mark.asyncio
     async def test_constructor_apiurl(self, event_loop, ipfsdaemon):

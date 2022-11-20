@@ -51,12 +51,19 @@ keyword arguments to set different values)::
 
     client = aioipfs.AsyncIPFS(host='10.0.12.3', port=5003)
 
+*HTTPS RPC*: if the node you're connecting to uses the *https* protocol
+to serve the RPC API, specify *https* in the multiaddr_, or force the
+URL scheme by passing *scheme*::
+
+    client = aioipfs.AsyncIPFS(maddr='/ip4/10.0.1.4/tcp/5001/https')
+
+    client = aioipfs.AsyncIPFS(host='10.0.1.4', scheme='https')
+
 Maximum HTTP connections and read timeout parameters::
 
     client = aioipfs.AsyncIPFS(host='localhost', port=5008, conns_max=20)
 
     client = aioipfs.AsyncIPFS(host='localhost', port=5008, read_timeout=30)
-
 
 Async context manager
 ---------------------

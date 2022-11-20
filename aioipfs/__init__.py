@@ -1,7 +1,8 @@
-__version__ = '0.6.1'
+__version__ = '0.6.2'
 
 from yarl import URL
 from distutils.version import StrictVersion
+from typing import Union
 
 import asyncio
 import aiohttp
@@ -39,6 +40,7 @@ class AsyncIPFS(object):
         (this is the preferred method of specifying the node's address)
     :param str host: Hostname/IP of the IPFS daemon to connect to
     :param int port: The API port of the IPFS deamon
+    :param str scheme: RPC API protocol: 'http' (default) or 'https'
     :param int conns_max: Maximum HTTP connections for this client
         (default: 0)
     :param int conns_max_per_host: Maximum per-host HTTP connections
@@ -53,7 +55,7 @@ class AsyncIPFS(object):
                  host: str = 'localhost',
                  port: int = RPC_API_DEFAULT_PORT,
                  scheme: str = 'http',
-                 maddr=None,
+                 maddr: Union[Multiaddr, str] = None,
                  loop=None,
                  conns_max: int = 0,
                  conns_max_per_host: int = 0,
@@ -125,10 +127,10 @@ class AsyncIPFS(object):
     @property
     def host_local(self):
         try:
-            addr = ipaddress.ip_address(self._host)
+            addr = ipaddress.ip_address(self.host)
             return addr.is_loopback
         except Exception:
-            return self._host in ['localhost', socket.gethostname()]
+            return self.host in ['localhost', socket.gethostname()]
 
     @property
     def port(self):
@@ -240,8 +242,8 @@ class AsyncIPFS(object):
             raise InvalidNodeAddressError()
 
         return URL.build(
-            host=self._host,
-            port=self._port,
+            host=self.host,
+            port=self.port,
             scheme=scheme,
             path=f'/api/{api_version}/'
         )
