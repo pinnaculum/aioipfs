@@ -2,6 +2,7 @@ image: "registry.gitlab.com/cipres/ipfs-void-storm:latest"
 
 stages:
   - build
+  - pypi
 
 variables:
   PATH: "/opt/ipfs/bin:/usr/bin:/bin:/sbin"
@@ -63,12 +64,18 @@ build:
     - pytest -v -s tests
     - python setup.py sdist bdist_wheel
 
-    - |-
-      if [[ "$CI_COMMIT_MESSAGE" =~ '[deploy]' ]]; then
-        pip install twine
-        twine upload dist/*
-      fi
-
   artifacts:
     paths:
       - dist/*.whl
+
+pypi:
+  image: python:3.8
+  stage: pypi
+  cache: {}
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[publish\]/
+      when: always
+  script:
+    - pip install -U twine
+    - python setup.py sdist bdist_wheel
+    - twine upload dist/*
