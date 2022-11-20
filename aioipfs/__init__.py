@@ -52,6 +52,7 @@ class AsyncIPFS(object):
     def __init__(self,
                  host: str = 'localhost',
                  port: int = RPC_API_DEFAULT_PORT,
+                 scheme: str = 'http',
                  maddr=None,
                  loop=None,
                  conns_max: int = 0,
@@ -64,11 +65,12 @@ class AsyncIPFS(object):
         self._conns_max_per_host = conns_max_per_host
         self._read_timeout = read_timeout
         self._debug = debug
-        self._host, self._port = None, None
+        self._host, self._port, self._scheme = None, None, None
         self.loop = loop if loop else asyncio.get_event_loop()
 
         self._api_url = self.__compute_base_api_url(host=host,
                                                     port=port,
+                                                    scheme=scheme,
                                                     maddr=maddr,
                                                     api_version=api_version)
 
@@ -133,6 +135,10 @@ class AsyncIPFS(object):
         return self._port
 
     @property
+    def scheme(self):
+        return self._scheme
+
+    @property
     def add(self):
         return self.core.add
 
@@ -188,7 +194,7 @@ class AsyncIPFS(object):
     def commands(self):
         return self.core.commands
 
-    def __compute_base_api_url(self, host=None, port=None,
+    def __compute_base_api_url(self, host=None, port=None, scheme='http',
                                maddr=None, api_version='v0'):
         """
         Compute and return the base kubo API url from the settings
@@ -214,6 +220,9 @@ class AsyncIPFS(object):
                         self._port = int(
                             node_maddr.value_for_protocol(proto.name)
                         )
+                    elif proto.name == 'https':
+                        scheme = 'https'
+                        self._scheme = scheme
 
                 assert isinstance(self._host, str)
                 assert isinstance(self._port, int)
@@ -226,13 +235,14 @@ class AsyncIPFS(object):
         elif isinstance(host, str) and isinstance(port, int):
             self._host = host
             self._port = port
+            self._scheme = scheme
         else:
             raise InvalidNodeAddressError()
 
         return URL.build(
             host=self._host,
             port=self._port,
-            scheme='http',
+            scheme=scheme,
             path=f'/api/{api_version}/'
         )
 
