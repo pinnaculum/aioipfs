@@ -69,13 +69,16 @@ build:
       - dist/*.whl
 
 pypi:
-  image: python:3.8
   stage: pypi
   cache: {}
   rules:
     - if: $CI_COMMIT_MESSAGE =~ /\[publish\]/
       when: always
   script:
+    - pip install -r requirements-dev.txt
+    - pip install -r requirements.txt
     - pip install -U twine
+
     - python setup.py sdist bdist_wheel
+
     - twine upload dist/*
