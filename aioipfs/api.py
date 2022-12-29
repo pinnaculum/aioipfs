@@ -1426,32 +1426,43 @@ class CoreAPI(SubAPI):
 
         return await self.fetch_raw(self.url('cat'), params=params)
 
-    def _extract_tar(self, archive_path: str, dstdir: str, compress: bool):
-        # Synchronous tar extraction runs in the executor
+    def __remove_tar(self, archive_fd: int, archive_path: str) -> None:
+        try:
+            os.close(archive_fd)
+            os.unlink(archive_path)
+        except Exception as err:
+            print(
+                f'Could not remove TAR file: {archive_path}: {err}',
+                file=sys.stderr
+            )
+
+    def _extract_tar(self,
+                     archive_path: str,
+                     dstdir: str,
+                     compress: bool) -> bool:
+        """
+        Synchronous tar extraction runs in the threadpool executor
+        """
 
         mode = 'r|gz' if compress is True else 'r|'
-
-        def remove_archive():
-            try:
-                os.unlink(archive_path)
-            except Exception as err:
-                print('Could not remove TAR file:', str(err), file=sys.stderr)
 
         try:
             with tarfile.open(name=archive_path, mode=mode) as tf:
                 tf.extractall(path=dstdir)
         except Exception as err:
-            print('Could not extract TAR file:', str(err), file=sys.stderr)
-            remove_archive()
+            print(
+                f'Failed to extract TAR file: {archive_path}: {err}',
+                file=sys.stderr
+            )
+
             return False
         else:
-            remove_archive()
             return True
 
     async def get(self, path, dstdir='.', compress=False,
                   compression_level=-1, archive=True, output=None,
                   progress_callback=None, progress_callback_arg=None,
-                  chunk_size=16384):
+                  chunk_size=262144):
         """
         Download IPFS objects.
 
@@ -1460,6 +1471,7 @@ class CoreAPI(SubAPI):
         :param bool compress: Compress the output with GZIP compression
         :param str compression_level: The level of compression (1-9)
         :param bool archive: Output a TAR archive
+        :param int chunk_size: HTTP chunk size
         """
 
         params = {
@@ -1472,7 +1484,7 @@ class CoreAPI(SubAPI):
         if isinstance(output, str):
             params['output'] = output
 
-        archive_path = tempfile.mkstemp(prefix='aioipfs')[1]
+        archive_fd, archive_path = tempfile.mkstemp(prefix='aioipfs')
 
         # We read chunk by chunk the tar data coming from the
         # daemon and use aiofiles to asynchronously write the data to
@@ -1503,15 +1515,22 @@ class CoreAPI(SubAPI):
 
         # Run the tar extraction inside asyncio's threadpool
         loop = asyncio.get_event_loop()
-        tar_future = loop.run_in_executor(
+
+        result = await loop.run_in_executor(
             None, self._extract_tar,
-            archive_path, dstdir, compress)
-        return await tar_future
+            archive_path,
+            dstdir,
+            compress
+        )
+
+        self.__remove_tar(archive_fd, archive_path)
+
+        return result
 
     async def getgen(self, objpath, dstdir='.', compress=False,
                      compression_level=-1, archive=True, output=None,
                      progress_callback=None, progress_callback_arg=None,
-                     sleept=0.05, chunk_size=16384):
+                     sleept=0.05, chunk_size=262144):
         """
         Download IPFS objects (async generator)
 
@@ -1520,6 +1539,7 @@ class CoreAPI(SubAPI):
         :param bool compress: Compress the output with GZIP compression
         :param str compression_level: The level of compression (1-9)
         :param bool archive: Output a TAR archive
+        :param int chunk_size: HTTP chunk size
         """
 
         params = {
@@ -1532,7 +1552,7 @@ class CoreAPI(SubAPI):
         if isinstance(output, str):
             params['output'] = output
 
-        archive_path = tempfile.mkstemp(prefix='aioipfs')[1]
+        archive_fd, archive_path = tempfile.mkstemp(prefix='aioipfs')
 
         # We read chunk by chunk the tar data coming from the
         # daemon and use aiofiles to asynchronously write the data to
@@ -1576,8 +1596,13 @@ class CoreAPI(SubAPI):
             loop = asyncio.get_event_loop()
             tar_future = loop.run_in_executor(
                 None, self._extract_tar,
-                archive_path, dstdir, compress)
+                archive_path,
+                dstdir,
+                compress
+            )
             res = await tar_future
+
+            self.__remove_tar(archive_fd, archive_path)
 
             if res is True:
                 yield 1, None, None

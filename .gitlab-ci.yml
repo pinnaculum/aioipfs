@@ -23,7 +23,8 @@ build:
           go-ipfs-0.13.0,
           kubo-0.14.0,
           kubo-0.15.0,
-          kubo-0.16.0
+          kubo-0.16.0,
+          kubo-0.17.0
         ]
 
   script:

@@ -7,13 +7,36 @@ import time
 import subprocess
 import os
 import os.path
+import platform
 import json
+import tarfile
 
 from pathlib import Path
 from multiaddr import Multiaddr
 
 import asyncio
 import aioipfs
+
+from aioipfs.util import DotJSON
+
+
+def ipfs_config_get():
+    p = subprocess.Popen(['ipfs', 'config', 'show'],
+                         stdout=subprocess.PIPE)
+    out, err = p.communicate()
+
+    try:
+        cfg = json.loads(out.decode())
+    except Exception:
+        return None
+    else:
+        return DotJSON(cfg)
+
+
+def ipfs_config_replace(filep: str):
+    p = subprocess.Popen(['ipfs', 'config', 'replace', filep])
+    p.communicate()
+    return p.returncode
 
 
 def ipfs_getconfig_var(var):
@@ -30,12 +53,13 @@ def datafiles():
 
 @pytest.fixture
 def smalltar():
-    import tarfile
-    tpath = tempfile.mkstemp()[1]
+    fd, tpath = tempfile.mkstemp()
     tar = tarfile.open(tpath, 'w|')
     tar.add(__file__)
     tar.close()
     yield tar, tpath
+
+    os.close(fd)
     os.unlink(tpath)
 
 
@@ -112,22 +136,26 @@ def ipfsdaemon():
     os.putenv('IPFS_PATH', tmpdir)
     os.system('ipfs init -e')
 
-    ipfs_config_json(
-        'Addresses.API', [
+    cfg = ipfs_config_get()
+
+    with tempfile.NamedTemporaryFile(mode='wt', delete=False) as ncfgf:
+        cfg.Addresses.API = [
             f'/ip4/127.0.0.1/tcp/{apiport}',
             f'/ip6/::1/tcp/{apiport}',
         ]
-    )
 
-    ipfs_config('Addresses.Gateway',
-                '/ip4/127.0.0.1/tcp/{0}'.format(gwport))
-    ipfs_config_json('Addresses.Swarm',
-                     [f"/ip4/127.0.0.1/tcp/{swarmport}"])
+        cfg.Addresses.Gateway = f'/ip4/127.0.0.1/tcp/{gwport}'
+        cfg.Addresses.Swarm = [f"/ip4/127.0.0.1/tcp/{swarmport}"]
 
-    # Empty bootstrap so we're not bothered
-    ipfs_config_json('Bootstrap', [])
-    ipfs_config_json('Experimental.Libp2pStreamMounting', True)
-    ipfs_config_json('Experimental.FilestoreEnabled', True)
+        # Empty bootstrap so we're not bothered
+        cfg.Bootstrap = []
+
+        cfg.Experimental.Libp2pStreamMounting = True
+        cfg.Experimental.FilestoreEnabled = True
+
+        cfg.write(ncfgf)
+
+    ipfs_config_replace(ncfgf.name)
 
     # Run the daemon and wait a bit
     sp = subprocess.Popen(['ipfs', 'daemon', '--enable-pubsub-experiment'],
@@ -188,7 +216,6 @@ class TestClientConstructor:
 
     @pytest.mark.asyncio
     async def test_constructor_apiurl(self, event_loop, ipfsdaemon):
-
         # Test by passing a host and port
         client = aioipfs.AsyncIPFS(
             host='localhost', port=apiport, loop=event_loop)
@@ -464,7 +491,7 @@ class TestAsyncIPFS:
         assert imported['Root']['Cid']['/'] is not None
         assert reply['Cid']['/'] == imported['Root']['Cid']['/']
 
-        filecar = tempfile.mkstemp()[1]
+        carfd, filecar = tempfile.mkstemp()
         with open(filecar, 'wb') as fd:
             fd.write(export)
 
@@ -472,9 +499,12 @@ class TestAsyncIPFS:
         assert imported['Root']['Cid']['/'] is not None
         assert reply['Cid']['/'] == imported['Root']['Cid']['/']
 
+        os.close(carfd)
         os.unlink(filecar)
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(platform.system() == 'Windows',
+                        reason='This kubo API is not available on your OS')
     async def test_diag(self, event_loop, ipfsdaemon, iclient, tmpdir):
         reply = await iclient.diag.sys()
         assert 'diskinfo' in reply
@@ -489,6 +519,20 @@ class TestAsyncIPFS:
         assert raw.decode() == '456789'
         raw = await iclient.cat(entry['Hash'], offset=2, length=3)
         assert raw.decode() == '234'
+        await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_get(self, event_loop, ipfsdaemon,
+                       iclient, testfile2, tmpdir):
+        cid: str = None
+
+        async for reply in iclient.add(str(testfile2)):
+            cid = reply['Hash']
+
+        result = await iclient.get(cid, dstdir=tmpdir)
+
+        assert result is True
+        assert cid in os.listdir(tmpdir)
         await iclient.close()
 
     @pytest.mark.asyncio
@@ -748,6 +792,8 @@ class TestAsyncIPFS:
 
         data = await iclient.files.read('/test9')
         assert data == obj
+
+        await iclient.close()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('obj1', [b'0123456789'])

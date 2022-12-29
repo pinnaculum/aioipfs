@@ -8,15 +8,17 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [3.7, 3.8, 3.9]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -25,18 +27,34 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
         pip install -r requirements.txt
+
     - name: Lint with flake8
       run: |
         flake8 aioipfs tests --count --select=E9,F63,F7,F82 --show-source --statistics
-    - name: wget
-      uses: wei/wget@v1
-      with:
-        args: -O kubo_v0.15.0_linux-amd64.tar.gz https://dist.ipfs.tech/kubo/v0.15.0/kubo_v0.15.0_linux-amd64.tar.gz
 
-    - name: extract
-      run: |
-        tar -C $GITHUB_WORKSPACE -xzvf kubo_v0.15.0_linux-amd64.tar.gz
-        echo "${GITHUB_WORKSPACE}/kubo" >> $GITHUB_PATH
+    - name: Fetch kubo (win)
+      uses: engineerd/configurator@v0.0.8
+      if: startsWith(matrix.os, 'windows')
+      with:
+        name: ipfs.exe
+        url: "https://dist.ipfs.tech/kubo/v0.17.0/kubo_v0.17.0_windows-amd64.zip"
+        pathInArchive: "kubo/ipfs.exe"
+
+    - name: Fetch kubo (linux)
+      uses: engineerd/configurator@v0.0.8
+      if: startsWith(matrix.os, 'ubuntu')
+      with:
+        name: ipfs
+        url: "https://dist.ipfs.tech/kubo/v0.17.0/kubo_v0.17.0_linux-amd64.tar.gz"
+        pathInArchive: "kubo/ipfs"
+
+    - name: Fetch kubo (macos)
+      uses: engineerd/configurator@v0.0.8
+      if: startsWith(matrix.os, 'macos')
+      with:
+        name: ipfs
+        url: "https://dist.ipfs.tech/kubo/v0.17.0/kubo_v0.17.0_darwin-amd64.tar.gz"
+        pathInArchive: "kubo/ipfs"
 
     - name: Test with pytest
       run: |
@@ -50,11 +68,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
-        python-version: 3.6
+        python-version: '3.9'
 
     - name: Build wheel
       run: |
