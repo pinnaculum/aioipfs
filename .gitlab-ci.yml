@@ -86,6 +86,6 @@ pypi:
     - pip install -r requirements.txt
     - pip install -U twine
 
-    - python setup.py sdist bdist_wheel
+    - python3 setup.py sdist bdist_wheel
 
     - twine upload dist/*
