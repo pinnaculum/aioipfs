@@ -77,7 +77,11 @@ pypi:
   rules:
     - if: $CI_COMMIT_MESSAGE =~ /\[publish\]/
       when: always
+  before_script:
+    - apt-get update
+    - apt-get install -qy --force-yes python3-pip python3-venv
   script:
+    - pip install wheel
     - pip install -r requirements-dev.txt
     - pip install -r requirements.txt
     - pip install -U twine
