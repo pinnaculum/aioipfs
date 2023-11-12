@@ -5,12 +5,12 @@ aioipfs
 :info: Asynchronous IPFS_ client library
 
 **aioipfs** is a python3 library providing an asynchronous API for IPFS_.
-Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*
+Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*, *3.10*, *3.11*.
 
 This library supports the
 `RPC API specifications <https://docs.ipfs.tech/reference/kubo/rpc>`_
-for kubo_ version *0.16.0*. Unit tests are run against
-most major go-ipfs releases (go-ipfs>0.8.0) and all kubo_
+for kubo_ version *0.24.0*. Unit tests are run against
+most major go-ipfs releases and all kubo_
 releases, see the *CI* section below.
 
 See `the documentation here <https://aioipfs.readthedocs.io/en/latest>`_.
@@ -28,7 +28,7 @@ Installation
     pip install aioipfs
 
 By default the *json* module from the standard Python library is used
-to decode JSON messages, but orjson_ will be used if installed:
+to decode JSON messages, but orjson_ will be used if it is installed:
 
 .. code-block:: shell
 
@@ -148,16 +148,8 @@ The Gitlab CI workflow runs unit tests against the following
 go-ipfs/kubo releases (`go here <https://gitlab.com/cipres/aioipfs/-/jobs>`_
 for the CI jobs overview).
 
-- go-ipfs 0.7.0
-- go-ipfs 0.8.0
-- go-ipfs 0.9.0
-- go-ipfs 0.10.0
-- go-ipfs 0.11.0
-- go-ipfs 0.12.0
-- go-ipfs 0.13.0
-- kubo 0.14.0
-- kubo 0.15.0
-- kubo 0.16.0
+- go-ipfs >=0.11.0,<=0.13.0
+- kubo >=0.14.0,<=0.24.0
 
 Features
 ========
@@ -172,7 +164,7 @@ event loop. TAR extraction is done in asyncio's threadpool.
 Requirements
 ============
 
-- Python >= 3.6, <= 3.9
+- Python >= 3.6, <= 3.11
 - aiohttp_
 - aiofiles_
 - py-multibase_

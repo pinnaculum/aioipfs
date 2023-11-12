@@ -2,6 +2,7 @@ import os.path
 import tarfile
 import tempfile
 import sys
+from typing import Union
 from pathlib import Path
 
 import asyncio
@@ -756,6 +757,39 @@ class NameAPI(SubAPI):
         super().__init__(driver)
 
         self.pubsub = NamePubsubAPI(driver)
+
+    async def inspect(self,
+                      record: Union[str, Path],
+                      verify: str = None,
+                      dump: bool = True):
+        """
+        Inspects an IPNS Record
+
+        :param record: Path to the file containing the IPNS record
+        :type record: Union[Path, str]
+        :param str verify: CID of the public IPNS key to validate against
+        :param bool dump: Include a full hex dump of the raw Protobuf record
+        """
+
+        if not isinstance(record, str) and not isinstance(record, Path):
+            raise ValueError('Invalid value type: should be Path or str')
+
+        if (isinstance(record, str) and not os.path.isfile(record)) or \
+           (isinstance(record, Path) and not record.is_file()):
+            raise ValueError(f'Invalid IPNS record file path: {record}')
+
+        params = {
+            'dump': boolarg(dump)
+        }
+
+        if isinstance(verify, str):
+            params['verify'] = verify
+
+        with multi.FormDataWriter() as mpwriter:
+            mpwriter.append_payload(multi.bytes_payload_from_file(str(record)))
+
+            return await self.post(self.url('name/inspect'),
+                                   mpwriter, params=params, outformat='json')
 
     async def publish(self, path, resolve=True, lifetime='24h',
                       key='self', ttl=None,

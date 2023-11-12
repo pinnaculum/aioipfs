@@ -27,7 +27,7 @@ copyright = '2022, aioipfs authors'
 author = 'cipres'
 
 # The short X.Y version
-version = '0.5.6'
+version = '0.6.4'
 # The full version, including alpha/beta/rc tags
 release = ''
 
