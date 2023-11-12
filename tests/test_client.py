@@ -1,3 +1,4 @@
+import base64
 import pytest
 
 import tempfile
@@ -18,6 +19,7 @@ import asyncio
 import aioipfs
 
 from aioipfs.util import DotJSON
+from aioipfs.multi import DirectoryListing
 
 
 def ipfs_config_get():
@@ -84,7 +86,7 @@ def random_word(length=8):
 
 
 @pytest.fixture
-def hiddendirs(tmpdir):
+def dir_hierarchy1(tmpdir):
     root = Path(str(tmpdir))
     root.joinpath('a/b/.c').mkdir(parents=True)
     root.joinpath('a/b/.c/file0').touch()
@@ -96,7 +98,7 @@ def hiddendirs(tmpdir):
 
 
 @pytest.fixture
-def ignoredirs(tmpdir):
+def dir_hierarchy2(tmpdir):
     root = Path(str(tmpdir))
     root.joinpath('a/b/.c').mkdir(parents=True)
     root.joinpath('d/.e/f').mkdir(parents=True)
@@ -107,8 +109,8 @@ def ignoredirs(tmpdir):
     root.joinpath('.file2').touch()
     ign = root.joinpath('.gitignore')
     ign.touch()
-    ign.write_text("README.txt\n.file2\na**\n\nd/.e/*/*\nd/.e/f\n")
-    return str(root)
+    ign.write_text("README.txt\n.file2\na\na/**\nd/.e/*/*\nd/.e/f\n")
+    return root
 
 
 def ipfs_config(param, value):
@@ -295,7 +297,17 @@ class TestAsyncIPFS:
         await iclient.swarm.addrs()
         await iclient.swarm.addrs_local()
         await iclient.swarm.addrs_listen()
+
         await iclient.close()
+
+    @pytest.mark.asyncio
+    async def test_swarm_resources(self, event_loop, ipfsdaemon, iclient):
+        if await iclient.agent_version_get() < \
+                aioipfs.IpfsDaemonVersion('0.20.0'):
+            # /api/v0/swarm/resources was introduced in kubo v0.19.0
+            pytest.skip('RPC endpoint not available')
+
+        assert 'System' in await iclient.swarm.resources()
 
     @pytest.mark.asyncio
     async def test_swarm_peering(self, event_loop, ipfsdaemon, iclient):
@@ -379,14 +391,15 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
-    async def test_hidden(self, event_loop, ipfsdaemon, iclient, hiddendirs):
-        async for added in iclient.add(hiddendirs, hidden=False):
+    async def test_hidden(self, event_loop, ipfsdaemon, iclient,
+                          dir_hierarchy1):
+        async for added in iclient.add(dir_hierarchy1, hidden=False):
             parts = added['Name'].split('/')
             for part in parts:
                 assert not part.startswith('.')
 
         names = []
-        async for added in iclient.add(hiddendirs, hidden=True):
+        async for added in iclient.add(dir_hierarchy1, hidden=True):
             names.append(added['Name'])
 
         assert 'test_hidden0/d/.e/f/.file3' in names
@@ -394,9 +407,9 @@ class TestAsyncIPFS:
 
     @pytest.mark.asyncio
     async def test_ignorerules(self, event_loop, ipfsdaemon, iclient,
-                               ignoredirs):
+                               dir_hierarchy2):
         names = []
-        async for added in iclient.add(ignoredirs,
+        async for added in iclient.add(str(dir_hierarchy2),
                                        ignore_rules_path='.gitignore',
                                        hidden=True):
             names.append(added['Name'])
@@ -409,7 +422,7 @@ class TestAsyncIPFS:
         assert 'test_ignorerules0/README2.txt' in names
 
         names = []
-        async for added in iclient.add(ignoredirs,
+        async for added in iclient.add(str(dir_hierarchy2),
                                        ignore_rules_path='.gitignore',
                                        hidden=False):
             names.append(added['Name'])
@@ -831,6 +844,37 @@ class TestAsyncIPFS:
         await iclient.close()
 
     @pytest.mark.asyncio
+    async def test_name_inspect(self, event_loop, ipfsdaemon, iclient):
+        """
+        Run name inspect on the node's IPNS key
+        """
+
+        if await iclient.agent_version_get() < \
+                aioipfs.IpfsDaemonVersion('0.20.0'):
+            # /api/v0/name/inspect was introduced in kubo v0.19.0
+            pytest.skip('RPC endpoint not available')
+
+        nid = (await iclient.id())['ID']
+        record = await iclient.routing.get(f'/ipns/{nid}')
+
+        with open('ipnsr.bin', 'w+b') as ipnsr:
+            ipnsr.write(base64.b64decode(record['Extra']))
+
+        result = await iclient.name.inspect('ipnsr.bin')
+        assert result['Entry']['Value']
+        assert result['Entry']['Validity']
+
+        # Try by passing a Path
+        result = await iclient.name.inspect(Path('ipnsr.bin'))
+        assert 'Entry' in result
+        assert result['Entry']['Value']
+        assert result['Entry']['Validity']
+
+        # Pass an invalid value type
+        with pytest.raises(ValueError):
+            await iclient.name.inspect(42)
+
+    @pytest.mark.asyncio
     async def test_config(self, event_loop, ipfsdaemon, iclient, tmpdir):
         conf = await iclient.config.show()
         assert 'API' in conf
@@ -914,3 +958,24 @@ class TestAsyncIPFS:
         assert len(res['RemoteServices']) == 0
 
         await iclient.close()
+
+
+class TestMultipart:
+    def test_dirlisting(self, dir_hierarchy2):
+        def find(name: str, data):
+            for entry in data:
+                _name, _fd, _ctype = entry[1]
+                if _name == f'{dir_hierarchy2.name}/{name}':
+                    return entry
+
+        names = DirectoryListing(str(dir_hierarchy2), hidden=True).genNames()
+
+        assert find('README.txt', names)
+        assert find('README2.txt', names)
+        assert find('d/.e/f/.file3', names)
+        assert find('a/b/.c', names)
+        assert find('.file2', names)
+
+        names = DirectoryListing(str(dir_hierarchy2), hidden=False).genNames()
+
+        assert find('.file2', names) is None

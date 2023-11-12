@@ -4,7 +4,7 @@ import posixpath
 import io
 import re
 
-from aioipfs.gitignore_parser import parse_gitignore
+from gitignore_parser import parse_gitignore
 import aiohttp
 from aiohttp import payload
 
@@ -160,7 +160,9 @@ class DirectoryListing:
                 return
 
             dir_unr = strip_first(short_path)
-            if dir_unr and self.ignrules and self.ignrules(dir_unr):
+            dir_fpath = os.path.join(self.directory, dir_unr)
+
+            if dir_unr and self.ignrules and self.ignrules(dir_fpath):
                 # Matches ignore rules
                 return
 
@@ -204,7 +206,7 @@ class DirectoryListing:
                     return
 
                 short_unr = strip_first(short_path)
-                if short_unr and self.ignrules and self.ignrules(short_unr):
+                if short_unr and self.ignrules and self.ignrules(full_path):
                     # Matches ignore rules
                     return
 
@@ -247,7 +249,11 @@ class DirectoryListing:
         if self.ign_path:
             if os.path.exists(self.ign_path) and not self.ignrules:
                 try:
-                    self.ignrules = parse_gitignore(self.ign_path)
+                    self.ignrules = parse_gitignore(
+                        self.ign_path,
+                        self.directory
+                    )
+
                 except Exception:
                     self.ignrules = None
 

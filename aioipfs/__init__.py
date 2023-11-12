@@ -1,4 +1,4 @@
-__version__ = '0.6.3'
+__version__ = '0.6.4'
 
 from yarl import URL
 from distutils.version import StrictVersion

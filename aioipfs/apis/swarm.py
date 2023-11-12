@@ -140,6 +140,14 @@ class SwarmAPI(SubAPI):
             return await self.post(self.url('swarm/limit'), mpwriter,
                                    params=params, outformat='json')
 
+    async def resources(self):
+        """
+        Get a summary of all resources accounted for by the
+        libp2p Resource Manager.
+        """
+
+        return await self.fetch_json(self.url('swarm/resources'))
+
     async def stats(self, scope: str):
         """
         Report resource usage for a scope
