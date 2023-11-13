@@ -96,7 +96,7 @@ def glob_compile(pat):
                 res = '%s[%s]' % (res, stuff)
         else:
             res = res + re.escape(c)
-    return re.compile('^' + res + r'\Z(?ms)' + '$')
+    return re.compile(r'(?ms)^' + res + r'\Z' + '$')
 
 
 class DirectoryListing:
