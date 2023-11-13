@@ -7,7 +7,14 @@
 aioipfs
 =======
 
-Asynchronous IPFS client API for Python3's asyncio.
+*aioipfs* is an asynchronous Python client library for
+`kubo <https://github.com/ipfs/kubo>`_ (formerly called *go-ipfs*),
+which is the reference implementation of the `IPFS <https://ipfs.tech>`_
+(*Interplanetary Filesystem*) protocol.
+
+*aioipfs* uses the `aiohttp <https://github.com/aio-libs/aiohttp>`_
+library to access kubo's
+`RPC <https://docs.ipfs.tech/reference/kubo/rpc>`_ endpoints.
 
 .. toctree::
    :maxdepth: 2
@@ -20,6 +27,10 @@ Asynchronous IPFS client API for Python3's asyncio.
 
 Installation
 ============
+
+You can use any Python version that supports
+`asyncio <https://docs.python.org/3/library/asyncio.html>`_
+and asynchronous generators (from Python version 3.6 to version 3.12).
 
 .. code-block:: shell
 
@@ -34,7 +45,7 @@ If you want to use orjson_ to decode JSON messages:
 Async IPFS client
 =================
 
-To create an :class:`~aioipfs.AsyncIPFS` client instance it's
+When creating a :class:`~aioipfs.AsyncIPFS` client instance it's
 recommended to specify the node's RPC API address with a multiaddr_::
 
     import aioipfs
@@ -135,6 +146,19 @@ object inside the MFS in the same RPC call, by using the *to_files*
 string argument, which should be the path in the MFS for the link::
 
     async for added in client.core.add('file1.txt', to_files='/file1.txt'):
+        print(added['Hash'])
+
+Ignoring files with .gitignore or .ipfsignore
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*aioipfs* supports the use of
+`gitignore <https://git-scm.com/docs/gitignore>`_ files to specify
+which files should not be imported in IPFS. Use the
+*ignore_rules_path* keyword argument to indicate the name of the file
+(relative to the directory you're importing) containing the ignore rules::
+
+    async for added in client.core.add('directory', recursive=True,
+                                       ignore_rules_path='.ipfsignore'):
         print(added['Hash'])
 
 Adding bytes
