@@ -1,5 +1,47 @@
 import json
 from functools import reduce
+from pathlib import Path
+
+try:
+    import ipfs_car_decoder as car_decoder
+    have_car_decoder = True
+except Exception:
+    have_car_decoder = False
+    car_decoder = None
+
+
+class CARDecoderMissing(Exception):
+    pass
+
+
+def car_open(car_path: Path):
+    """
+    Open a Content-Adressed aRchive file and return the CAR stream.
+
+    :param Path car_path: CAR file path
+    """
+
+    if not have_car_decoder:
+        raise CARDecoderMissing()
+
+    return car_decoder.FileByteStream(car_path)
+
+
+async def car_bytes(stream, cid: str) -> bytes:
+    """
+    CAR stream to bytes
+
+    :param stream: CAR stream
+    :param str cid: CID of the UnixFS directory to export
+    :rtype: bytes
+    """
+
+    buff = b''
+
+    async for chunk in car_decoder.stream_bytes(cid, stream):
+        buff += chunk
+
+    return buff
 
 
 class DotJSON(dict):

@@ -1,4 +1,5 @@
 import os.path
+from pathlib import Path
 from aiohttp import payload
 
 from aioipfs.api import SubAPI
@@ -6,6 +7,7 @@ from aioipfs.api import boolarg
 from aioipfs.api import ARG_PARAM
 from aioipfs import multi
 from aioipfs import UnknownAPIError
+from aioipfs import util
 
 
 class DagAPI(SubAPI):
@@ -44,17 +46,62 @@ class DagAPI(SubAPI):
             return await self.post(self.url('dag/put'), mpwriter,
                                    params=params, outformat='json')
 
-    async def car_export(self, cid, progress=False):
+    async def car_export(self, cid: str, progress: bool = False,
+                         output_path: Path = None):
         """
-        Streams the selected DAG as a .car stream on stdout.
+        Streams the selected DAG as a .car stream and return it
+        as a raw buffer or write it to a file if output_path is
+        passed.
 
-        :param str cid: CID of a root to recursively export
+        :param str cid: Root CID of a DAG to recursively export
+        :param bool progress: Stream progress
+        :param Path output_path: Write the CAR data to this file (optional)
         """
 
-        return await self.fetch_raw(
+        car_data = await self.fetch_raw(
             self.url('dag/export'),
             params={ARG_PARAM: cid, 'progress': boolarg(progress)}
         )
+
+        if output_path is None:
+            return car_data
+        else:
+            with open(output_path, 'wb') as car:
+                car.write(car_data)
+
+    export = car_export
+
+    async def export_to_directory(self,
+                                  cid: str,
+                                  dst_dir: Path) -> bool:
+        """
+        Export a UnixFS DAG to a CAR and unpack it to a directory
+
+        :param str cid: CID of a UnixFS DAG to recursively export
+        :param Path dst_dir: Filesystem destination path
+        :rtype: bool
+        """
+
+        if not util.have_car_decoder:
+            raise util.CARDecoderMissing(
+                'The CAR decoding library is not available')
+
+        if not dst_dir.exists():
+            dst_dir.mkdir(parents=True, exist_ok=True)
+
+        stream = await self.car_stream(
+            self.url('dag/export'),
+            params={ARG_PARAM: cid, 'progress': boolarg(False)}
+        )
+
+        if not stream:
+            raise ValueError(f'Failed to get car stream for {cid}')
+
+        await util.car_decoder.write_car_filesystem_to_path(
+            cid, stream, str(dst_dir)
+        )
+
+        return True
 
     async def get(self, objpath, output_codec=None):
         """

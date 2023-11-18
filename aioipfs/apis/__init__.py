@@ -11,6 +11,7 @@ from aiohttp.client_exceptions import *  # noqa
 
 from aioipfs.helpers import *  # noqa
 from aioipfs.exceptions import *  # noqa
+from aioipfs.util import car_decoder, have_car_decoder
 
 
 DEFAULT_TIMEOUT = 60 * 60
@@ -101,6 +102,20 @@ class SubAPI:
                 self.handle_error(response, data)
 
             return data
+
+    async def car_stream(self, url, params={}):
+        if not have_car_decoder:
+            raise Exception('The CAR decoding library is not available')
+
+        stream = car_decoder.ChunkedMemoryByteStream()
+
+        async with self.driver.session.post(url, params=params) as resp:
+            async for chunk, _ in resp.content.iter_chunks():
+                await stream.append_bytes(chunk)
+
+        await stream.mark_complete()
+
+        return stream
 
     async def fetch_json(self, url, params={}, timeout=DEFAULT_TIMEOUT):
         return await self.post(url, params=params, outformat='json')
