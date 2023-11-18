@@ -1,7 +1,8 @@
 aiohttp>=3.7.4
 aiofiles>=0.7.0
 base58>=1.0.2
-gitignore-parser>=0.1.9
+gitignore-parser==0.1.9
 multiaddr>=0.0.9
 py-multibase>=1.0.3
 py-multiformats-cid>=0.4.3
+setuptools>=67.7.0

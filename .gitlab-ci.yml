@@ -56,8 +56,7 @@ variables:
     - python -m pip install --upgrade pip
 
     - pip install wheel
-    - pip install -r requirements-dev.txt
-    - pip install -r requirements.txt
+    - pip install '.[car,test]'
 
     - flake8 aioipfs tests --count --select=E9,F63,F7,F82 --show-source --statistics
     - python3 setup.py build install
@@ -73,11 +72,25 @@ build-3.9:
   extends: ".build"
   stage: "build"
   image: "python:3.9-bullseye"
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[test-all\]/ || $CI_COMMIT_MESSAGE =~ /\[test-39\]/
+      when: always
 
 build-3.11:
   extends: ".build"
   stage: "build"
   image: "python:3.11"
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[test-all\]/ || $CI_COMMIT_MESSAGE =~ /\[test-311\]/
+      when: always
+
+build-3.12:
+  extends: ".build"
+  stage: "build"
+  image: "python:3.12"
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[test-all\]/ || $CI_COMMIT_MESSAGE =~ /\[test-312\]/
+      when: always
 
 pypi:
   image: "python:3.9-bullseye"
@@ -94,14 +107,16 @@ pypi:
     - source venv/bin/activate
     - python -m pip install --upgrade pip
 
-    - pip install -r requirements-dev.txt
-    - pip install -r requirements.txt
+    - pip install '.[car,test]'
     - pip install -U twine
 
     - python3 setup.py sdist bdist_wheel
 
     - |-
-      if [[ $CI_COMMIT_BRANCH =~ /^master$/ ]]; then
+      echo "Branch is: $CI_COMMIT_BRANCH"
+
+      if [[ "$CI_COMMIT_BRANCH" == "master" ]]; then
+        twine check dist/*.whl
         twine upload dist/*
       else
         twine check dist/*.whl

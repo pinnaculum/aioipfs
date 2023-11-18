@@ -5,7 +5,7 @@ aioipfs
 :info: Asynchronous IPFS_ client library
 
 **aioipfs** is a python3 library providing an asynchronous API for IPFS_.
-Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*, *3.10*, *3.11*.
+Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*, *3.10*, *3.11*, *3.12*.
 
 This library supports the
 `RPC API specifications <https://docs.ipfs.tech/reference/kubo/rpc>`_
@@ -26,6 +26,14 @@ Installation
 .. code-block:: shell
 
     pip install aioipfs
+
+Support for CAR (Content-addressed Archives) decoding (with the
+`ipfs-car-decoder package <https://github.com/kralverde/py-ipfs-car-decoder/>`_)
+can be enabled with the *car* extra:
+
+.. code-block:: shell
+
+    pip install 'aioipfs[car]'
 
 By default the *json* module from the standard Python library is used
 to decode JSON messages, but orjson_ will be used if it is installed:

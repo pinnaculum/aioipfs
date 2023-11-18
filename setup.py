@@ -7,11 +7,7 @@ import codecs
 from setuptools import setup
 from setuptools import find_packages
 
-PY_VER = sys.version_info
-
-if PY_VER >= (3, 6):
-    pass
-else:
+if sys.version_info < (3, 6):
     raise RuntimeError("You need python3.6 or newer")
 
 with codecs.open(os.path.join(os.path.abspath(os.path.dirname(
@@ -28,6 +24,9 @@ with open("README.rst", "r") as fh:
 with open('requirements.txt') as f:
     install_reqs = f.read().splitlines()
 
+with open('requirements-dev.txt') as f:
+    install_test_reqs = f.read().splitlines()
+
 setup(
     name='aioipfs',
     version=version,
@@ -42,7 +41,9 @@ setup(
     include_package_data=False,
     install_requires=install_reqs,
     extras_require={
-        'orjson': ['orjson>=3.0']
+        'orjson': ['orjson>=3.0'],
+        'car': ['ipfs-car-decoder==0.1.1'],
+        'test': install_test_reqs
     },
     classifiers=[
         'Programming Language :: Python',
@@ -52,6 +53,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12'
         'Intended Audience :: Developers',
         'Development Status :: 5 - Production/Stable',
         'Natural Language :: English',
