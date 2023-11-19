@@ -16,7 +16,7 @@ class CARDecoderMissing(Exception):
 
 def car_open(car_path: Path):
     """
-    Open a Content-Adressed aRchive file and return the CAR stream.
+    Open a Content-Addressable aRchive file and return the CAR stream.
 
     :param Path car_path: CAR file path
     """

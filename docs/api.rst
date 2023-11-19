@@ -51,6 +51,12 @@ aioipfs.apis.swarm module
 .. automodule:: aioipfs.apis.swarm
     :members:
 
+aioipfs.util module
+-------------------
+
+.. automodule:: aioipfs.util
+    :members:
+
 aioipfs.exceptions module
 -------------------------
 

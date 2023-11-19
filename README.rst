@@ -27,7 +27,7 @@ Installation
 
     pip install aioipfs
 
-Support for CAR (Content-addressed Archives) decoding (with the
+Support for CAR (Content-Addressable Archives) decoding (with the
 `ipfs-car-decoder package <https://github.com/kralverde/py-ipfs-car-decoder/>`_)
 can be enabled with the *car* extra:
 
