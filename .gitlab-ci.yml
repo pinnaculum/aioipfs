@@ -22,7 +22,8 @@ variables:
           kubo-0.21.0,
           kubo-0.22.0,
           kubo-0.23.0,
-          kubo-0.24.0
+          kubo-0.24.0,
+          kubo-0.26.0
         ]
 
   script:

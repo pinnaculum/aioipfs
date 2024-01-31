@@ -430,12 +430,14 @@ class TestAsyncIPFS:
     @pytest.mark.asyncio
     async def test_addtar(self, event_loop, ipfsdaemon, iclient,
                           tmpdir, smalltar):
-        tar, tarpath = smalltar
-        reply = await iclient.tar.add(tarpath)
-        tarhash = reply['Hash']
-        fetched = await iclient.tar.cat(tarhash)
-        f = tmpdir.join('new.tar')
-        f.write(fetched)
+        if await iclient.agent_version_get() < \
+                aioipfs.IpfsDaemonVersion('0.26.0'):
+            tar, tarpath = smalltar
+            reply = await iclient.tar.add(tarpath)
+            tarhash = reply['Hash']
+            fetched = await iclient.tar.cat(tarhash)
+            f = tmpdir.join('new.tar')
+            f.write(fetched)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize('order', ['gin', 'tonic'])
@@ -923,6 +925,34 @@ class TestAsyncIPFS:
         await iclient.cid.codecs()
         await iclient.cid.bases()
         await iclient.cid.hashes()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize('pin_name', ['pintest'])
+    async def test_pin(self, event_loop, ipfsdaemon, iclient, pin_name):
+        entry = await iclient.add_bytes(b'Test', pin=False)
+
+        if await iclient.agent_version_get() >= \
+                aioipfs.IpfsDaemonVersion('0.26.0'):
+            """
+            kubo >= 0.26.0 supports optional pin names
+
+            Pin the object with a pin name and check that the entry
+            has the correct name when listing the pins
+            """
+
+            resp = [e async for e in iclient.pin.add(
+                entry['Hash'],
+                name=pin_name
+            )]
+            assert len(resp) > 0
+
+            pins = await iclient.pin.ls(names=True)
+            pine = pins['Keys'].get(entry['Hash'])
+
+            assert pine['Name'] == pin_name
+        else:
+            resp = [e async for e in iclient.pin.add(entry['Hash'])]
+            assert len(resp) > 0
 
     @pytest.mark.asyncio
     @pytest.mark.skip(reason='This test relies on specific network conditions')

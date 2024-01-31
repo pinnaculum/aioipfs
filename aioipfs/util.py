@@ -32,7 +32,7 @@ async def car_bytes(stream, cid: str) -> bytes:
     CAR stream to bytes
 
     :param stream: CAR stream
-    :param str cid: CID of the UnixFS directory to export
+    :param str cid: CID of the UnixFS file to export
     :rtype: bytes
     """
 

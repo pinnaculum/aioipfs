@@ -145,13 +145,15 @@ class PinAPI(SubAPI):
 
         self.remote = PinRemoteAPI(driver)
 
-    async def add(self, path, recursive=True, progress=True):
+    async def add(self, path, recursive=True, progress=True,
+                  name: str = None):
         """
         Pin objects to local storage.
 
         :param str path: Path to object(s) to be pinned
         :param bool recursive: Recursively pin the object linked to
             by the specified object(s)
+        :param str name: An optional name for the created pin(s)
         :param bool progress: Show progress
         """
 
@@ -162,12 +164,16 @@ class PinAPI(SubAPI):
             'progress': boolarg(progress)
         }
 
+        if isinstance(name, str) and len(name) > 0:
+            params['name'] = name
+
         async for added in self.mjson_decode(
                 self.url('pin/add'), params=params):
             yield added
 
     async def ls(self, path=None, pintype='all', quiet=False,
-                 stream: bool = False):
+                 stream: bool = False,
+                 names: bool = False):
         """
         List objects pinned to local storage.
 
@@ -176,12 +182,14 @@ class PinAPI(SubAPI):
             "direct", "indirect", "recursive", or "all"
         :param bool quiet: Write just hashes of objects
         :param bool stream: Enable streaming of pins as they are discovered
+        :param bool names: Enable displaying pin names
         """
 
         params = {
             'type': pintype,
             'quiet': boolarg(quiet),
-            'stream': boolarg(stream)
+            'stream': boolarg(stream),
+            'names': boolarg(names)
         }
         if path:
             params[ARG_PARAM] = path

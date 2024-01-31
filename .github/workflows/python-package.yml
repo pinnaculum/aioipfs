@@ -32,7 +32,7 @@ jobs:
       if: startsWith(matrix.os, 'windows')
       with:
         name: ipfs.exe
-        url: "https://dist.ipfs.tech/kubo/v0.24.0/kubo_v0.24.0_windows-amd64.zip"
+        url: "https://dist.ipfs.tech/kubo/v0.26.0/kubo_v0.26.0_windows-amd64.zip"
         pathInArchive: "kubo/ipfs.exe"
 
     - name: Fetch kubo (linux)
@@ -40,7 +40,7 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       with:
         name: ipfs
-        url: "https://dist.ipfs.tech/kubo/v0.24.0/kubo_v0.24.0_linux-amd64.tar.gz"
+        url: "https://dist.ipfs.tech/kubo/v0.26.0/kubo_v0.26.0_linux-amd64.tar.gz"
         pathInArchive: "kubo/ipfs"
 
     - name: Fetch kubo (macos)
@@ -48,7 +48,7 @@ jobs:
       if: startsWith(matrix.os, 'macos')
       with:
         name: ipfs
-        url: "https://dist.ipfs.tech/kubo/v0.24.0/kubo_v0.24.0_darwin-amd64.tar.gz"
+        url: "https://dist.ipfs.tech/kubo/v0.26.0/kubo_v0.26.0_darwin-amd64.tar.gz"
         pathInArchive: "kubo/ipfs"
 
     - name: Test with pytest
