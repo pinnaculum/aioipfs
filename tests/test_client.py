@@ -13,6 +13,7 @@ import json
 import tarfile
 import sys
 
+from distutils.version import StrictVersion
 from pathlib import Path
 from multiaddr import Multiaddr
 
@@ -21,6 +22,7 @@ import aioipfs
 
 from aioipfs import util
 from aioipfs.multi import DirectoryListing
+from aioipfs.exceptions import RPCAccessDenied
 
 
 def ipfs_config_get():
@@ -47,6 +49,14 @@ def ipfs_getconfig_var(var):
                                      var], stdout=subprocess.PIPE)
     stdout, stderr = sp_getconfig.communicate()
     return stdout.decode()
+
+
+@pytest.fixture
+def ipfs_version():
+    p = subprocess.Popen(['ipfs', 'version'],
+                         stdout=subprocess.PIPE)
+    stdout, _ = p.communicate()
+    return StrictVersion(stdout.decode().replace('ipfs version ', ''))
 
 
 @pytest.fixture
@@ -178,6 +188,63 @@ def ipfsdaemon():
     sp.terminate()
 
 
+apiport_a = 9011
+gwport_a = 9090
+swarmport_a = 9012
+
+
+@pytest.fixture(scope='module')
+def ipfsdaemon_with_auth():
+    tmpdir = tempfile.mkdtemp()
+
+    os.putenv('IPFS_PATH', tmpdir)
+    os.system('ipfs init -e')
+
+    cfg = ipfs_config_get()
+
+    with tempfile.NamedTemporaryFile(mode='wt', delete=False) as ncfgf:
+        cfg.Addresses.API = [
+            f'/ip4/127.0.0.1/tcp/{apiport_a}',
+            f'/ip6/::1/tcp/{apiport_a}',
+        ]
+
+        cfg.Addresses.Gateway = f'/ip4/127.0.0.1/tcp/{gwport_a}'
+        cfg.Addresses.Swarm = [f"/ip4/127.0.0.1/tcp/{swarmport_a}"]
+
+        # Empty bootstrap so we're not bothered
+        cfg.Bootstrap = []
+
+        cfg.Experimental.Libp2pStreamMounting = True
+        cfg.Experimental.FilestoreEnabled = True
+
+        cfg.API.Authorizations = {
+            'Alice': {
+                "AuthSecret": "basic:alice:password123",
+                "AllowedPaths": ["/api/v0/files"]
+            },
+            'John': {
+                "AuthSecret": "basic:john:12345",
+                "AllowedPaths": ["/api/v0/add"]
+            },
+            'Bear': {
+                "AuthSecret": "bearer:token123",
+                "AllowedPaths": ["/api/v0"]
+            }
+        }
+
+        cfg.write(ncfgf)
+
+    ipfs_config_replace(ncfgf.name)
+
+    sp = subprocess.Popen(['ipfs', 'daemon'], stdout=subprocess.PIPE)
+    time.sleep(1)
+
+    yield tmpdir, sp
+
+    time.sleep(0.5)
+    sp.terminate()
+
+
 @pytest.fixture
 def ipfs_peerid(ipfsdaemon):
     return ipfs_getconfig_var('Identity.PeerID').strip()
@@ -186,6 +253,13 @@ def ipfs_peerid(ipfsdaemon):
 @pytest.fixture(autouse=True)
 async def iclient(event_loop):
     client = aioipfs.AsyncIPFS(port=apiport, loop=event_loop)
+    yield client
+    await client.close()
+
+
+@pytest.fixture(autouse=True)
+async def iclient_with_auth(event_loop):
+    client = aioipfs.AsyncIPFS(port=apiport_a, loop=event_loop)
     yield client
     await client.close()
 
@@ -283,6 +357,22 @@ class TestClientConstructor:
         # The default constructor should always use localhost:5001
         client = aioipfs.AsyncIPFS()
         assert str(client.api_url) == 'http://localhost:5001/api/v0/'
+
+    @pytest.mark.asyncio
+    async def test_constructor_auth(self, event_loop):
+        client = aioipfs.AsyncIPFS(auth=aioipfs.BasicAuth('bob', 'pwd'))
+        assert client.auth.login == 'bob'
+        assert client.auth.password == 'pwd'
+
+        clif = aioipfs.AsyncIPFS()
+        with pytest.raises(ValueError):
+            clif.auth = 'basic:test:test'
+
+        clif.auth = aioipfs.BearerAuth('secret-token')
+        assert clif.auth.token == 'secret-token'
+
+        clif.auth = None
+        assert clif.auth is None
 
 
 class TestAsyncIPFS:
@@ -387,6 +477,38 @@ class TestAsyncIPFS:
             # Valid MFS path
             await iclient.add_str('test', to_files='/wslash')
             assert (await iclient.files.read('/wslash')).decode() == 'test'
+
+    @pytest.mark.asyncio
+    async def test_auth(self, event_loop, ipfsdaemon_with_auth,
+                        ipfs_version,
+                        iclient_with_auth, testfile1):
+        if ipfs_version < aioipfs.IpfsDaemonVersion('0.25.0'):
+            # RPC Authorization was introduced in kubo v0.25.0
+            pytest.skip('RPC Authorization not supported ')
+
+        iclient_with_auth.auth = aioipfs.BasicAuth('alice', 'password123')
+
+        with pytest.raises(RPCAccessDenied):
+            await iclient_with_auth.core.id()
+
+        # alice can use the 'files' API
+        assert await iclient_with_auth.files.ls('/')
+
+        # alice doesn't have access to the 'add' API
+        cids = [added['Hash'] async for added in iclient_with_auth.add(
+            str(testfile1))]
+        assert len(cids) == 0
+
+        # john, however, does
+        iclient_with_auth.auth = aioipfs.BasicAuth('john', '12345')
+        cids = [added['Hash'] async for added in iclient_with_auth.add(
+            str(testfile1))]
+        assert len(cids) == 1
+
+        # The token has access to the whole APi
+        iclient_with_auth.auth = aioipfs.BearerAuth('token123')
+        assert await iclient_with_auth.files.ls('/')
+        assert await iclient_with_auth.core.id()
 
     @pytest.mark.asyncio
     async def test_hidden(self, event_loop, ipfsdaemon, iclient,

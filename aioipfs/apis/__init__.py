@@ -65,6 +65,10 @@ class SubAPI:
 
         msg, code = self.decode_error(data)
 
+        if response.status == HTTPForbidden.status_code:
+            # 403
+            raise RPCAccessDenied(str(msg))
+
         if isinstance(msg, str) and code is not None:
             # Check for specific errors
 
@@ -88,7 +92,8 @@ class SubAPI:
             raise UnknownAPIError()
 
     async def fetch_text(self, url, params={}, timeout=DEFAULT_TIMEOUT):
-        async with self.driver.session.post(url, params=params) as response:
+        async with self.driver.session.post(url, params=params,
+                                            auth=self.driver.auth) as response:
             status, textdata = response.status, await response.text()
             if status in HTTP_ERROR_CODES:
                 self.handle_error(response, textdata)
@@ -96,7 +101,8 @@ class SubAPI:
             return textdata
 
     async def fetch_raw(self, url, params={}, timeout=DEFAULT_TIMEOUT):
-        async with self.driver.session.post(url, params=params) as response:
+        async with self.driver.session.post(url, params=params,
+                                            auth=self.driver.auth) as response:
             status, data = response.status, await response.read()
             if status in HTTP_ERROR_CODES:
                 self.handle_error(response, data)
@@ -109,7 +115,8 @@ class SubAPI:
 
         stream = car_decoder.ChunkedMemoryByteStream()
 
-        async with self.driver.session.post(url, params=params) as resp:
+        async with self.driver.session.post(url, params=params,
+                                            auth=self.driver.auth) as resp:
             async for chunk, _ in resp.content.iter_chunks():
                 await stream.append_bytes(chunk)
 
@@ -124,6 +131,7 @@ class SubAPI:
                    outformat='text'):
         try:
             async with self.driver.session.post(url, data=data,
+                                                auth=self.driver.auth,
                                                 headers=headers,
                                                 params=params) as response:
                 if response.status in HTTP_ERROR_CODES:
@@ -148,8 +156,7 @@ class SubAPI:
             raise apierr
         except (ClientPayloadError,
                 ClientConnectorError,
-                ServerDisconnectedError,
-                BaseException) as err:
+                ServerDisconnectedError) as err:
             if self.driver.debug:
                 print(f'{url}: aiohttp error: {err}',
                       file=sys.stderr)
@@ -170,7 +177,7 @@ class SubAPI:
         :param params: http params
         """
 
-        kwargs = {'params': params if params else {}}
+        kwargs = {'params': params if params else {}, 'auth': self.driver.auth}
 
         if new_session is True:
             session = self.driver.get_session(

@@ -23,7 +23,8 @@ variables:
           kubo-0.22.0,
           kubo-0.23.0,
           kubo-0.24.0,
-          kubo-0.26.0
+          kubo-0.26.0,
+          kubo-0.27.0
         ]
 
   script:
@@ -56,14 +57,12 @@ variables:
     - source venv/bin/activate
     - python -m pip install --upgrade pip
 
-    - pip install wheel
+    - pip install wheel build
     - pip install '.[car,test]'
 
     - flake8 aioipfs tests --count --select=E9,F63,F7,F82 --show-source --statistics
-    - python3 setup.py build install
-
+    - python -m build
     - pytest -v -s tests
-    - python setup.py sdist bdist_wheel
 
   artifacts:
     paths:
@@ -109,9 +108,9 @@ pypi:
     - python -m pip install --upgrade pip
 
     - pip install '.[car,test]'
-    - pip install -U twine
+    - pip install -U twine build
 
-    - python3 setup.py sdist bdist_wheel
+    - python -m build
 
     - |-
       echo "Branch is: $CI_COMMIT_BRANCH"

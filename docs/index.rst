@@ -84,6 +84,31 @@ Maximum HTTP connections and read timeout parameters::
 
     client = aioipfs.AsyncIPFS(host='localhost', port=5008, read_timeout=30)
 
+RPC authentication credentials
+------------------------------
+
+Starting with version *0.25.0*, kubo supports limiting access to certain parts
+of the RPC API by requiring the client to provide credentials via the HTTP
+*Authorization* header, either with a simple *Basic Auth* login and password, or
+with a token. `kubo RPC Authorization documentation <https://github.com/ipfs/kubo/blob/master/docs/config.md#apiauthorizations>`_.
+
+If the kubo server requires authentication, you can pass the authentication
+credentials via the constructor's *auth* keyword argument::
+
+    client = aioipfs.AsyncIPFS(auth=aioipfs.BasicAuth('john', 'password123'))
+
+    client = aioipfs.AsyncIPFS(auth=aioipfs.BearerAuth('my-secret-token'))
+
+You can change the credentials at any time by setting the
+*auth* object attribute::
+
+    client.auth = aioipfs.BasicAuth('alice', 'anotherpass')
+
+    client.auth = None
+
+A :class:`~aioipfs.exceptions.RPCAccessDenied` exception will be raised
+if you are forbidden to use a certain API or if your credentials are invalid.
+
 Async context manager
 ---------------------
 

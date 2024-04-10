@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=67.7.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aioipfs"
+dynamic = ["version"]
+authors = [{name = "cipres", email = "alkaline@gmx.co.uk"}]
+license = {text = "LGPLv3"}
+description = "Asynchronous IPFS client library"
+keywords = ["asyncio", "aiohttp", "ipfs"]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Developers",
+    "Development Status :: 5 - Production/Stable",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Topic :: System :: Filesystems",
+    "Topic :: Communications :: File Sharing",
+]
+urls = {Homepage = "https://gitlab.com/cipres/aioipfs"}
+dependencies = [
+    "aiohttp>=3.7.4",
+    "aiofiles>=0.7.0",
+    "base58>=1.0.2",
+    "gitignore-parser==0.1.9",
+    "multiaddr>=0.0.9",
+    "py-multibase>=1.0.3",
+    "py-multiformats-cid>=0.4.3",
+    "setuptools>=67.7.0",
+]
+
+[project.readme]
+file = "README.rst"
+content-type = "text/x-rst"
+
+[project.optional-dependencies]
+orjson = ["orjson>=3.0"]
+car = ["ipfs-car-decoder==0.1.1"]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "tox",
+    "flake8",
+    "wheel",
+]
+docs = [
+    "sphinx==5.3.0",
+    "sphinxcontrib-asyncio",
+    "guzzle_sphinx_theme"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "aioipfs.__version__"}
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+exclude = ["tests"]
+namespaces = false

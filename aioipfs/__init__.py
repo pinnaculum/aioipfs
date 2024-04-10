@@ -1,4 +1,4 @@
-__version__ = '0.6.6'
+__version__ = '0.6.7'
 
 from yarl import URL
 from distutils.version import StrictVersion
@@ -9,6 +9,8 @@ import aiohttp
 import ipaddress
 import re
 import socket
+
+from aiohttp import BasicAuth
 
 from multiaddr import Multiaddr
 from multiaddr.exceptions import ParseError
@@ -30,6 +32,18 @@ RPC_API_DEFAULT_PORT = 5001
 
 class IpfsDaemonVersion(StrictVersion):
     pass
+
+
+class BearerAuth(BasicAuth):
+    """
+    Cheap subclass of BasicAuth to authenticate with a token
+    """
+
+    def __init__(self, token: str):
+        self.token = token
+
+    def encode(self) -> str:
+        return f'Bearer {self.token}'
 
 
 class AsyncIPFS(object):
@@ -56,6 +70,7 @@ class AsyncIPFS(object):
                  port: int = RPC_API_DEFAULT_PORT,
                  scheme: str = 'http',
                  maddr: Union[Multiaddr, str] = None,
+                 auth: Union[BasicAuth, BearerAuth] = None,
                  loop=None,
                  conns_max: int = 0,
                  conns_max_per_host: int = 0,
@@ -75,6 +90,8 @@ class AsyncIPFS(object):
                                                     scheme=scheme,
                                                     maddr=maddr,
                                                     api_version=api_version)
+        self.__auth = auth if isinstance(auth,
+                                         (BasicAuth, BearerAuth)) else None
 
         self.session = self.get_session()
 
@@ -195,6 +212,17 @@ class AsyncIPFS(object):
     @property
     def commands(self):
         return self.core.commands
+
+    @property
+    def auth(self):
+        return self.__auth
+
+    @auth.setter
+    def auth(self, authh: Union[BasicAuth, BearerAuth, None]):
+        if authh and not isinstance(authh, (BasicAuth, BearerAuth)):
+            raise ValueError('Invalid authentication helper')
+
+        self.__auth = authh
 
     def __compute_base_api_url(self, host=None, port=None, scheme='http',
                                maddr=None, api_version='v0'):

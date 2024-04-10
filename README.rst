@@ -9,7 +9,7 @@ Supported python versions: *3.6*, *3.7*, *3.8*, *3.9*, *3.10*, *3.11*, *3.12*.
 
 This library supports the
 `RPC API specifications <https://docs.ipfs.tech/reference/kubo/rpc>`_
-for kubo_ version *0.26.0*. Unit tests are run against
+for kubo_ version *0.27.0*. Unit tests are run against
 most major go-ipfs releases and all kubo_
 releases, see the *CI* section below.
 
@@ -157,7 +157,7 @@ go-ipfs/kubo releases (`go here <https://gitlab.com/cipres/aioipfs/-/jobs>`_
 for the CI jobs overview).
 
 - go-ipfs >=0.11.0,<=0.13.0
-- kubo >=0.14.0,<=0.26.0
+- kubo >=0.14.0,<=0.27.0
 
 Features
 ========
@@ -172,7 +172,7 @@ event loop. TAR extraction is done in asyncio's threadpool.
 Requirements
 ============
 
-- Python >= 3.6, <= 3.11
+- Python >= 3.6, <= 3.12
 - aiohttp_
 - aiofiles_
 - py-multibase_

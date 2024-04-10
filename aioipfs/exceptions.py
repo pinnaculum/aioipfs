@@ -9,6 +9,12 @@ class IPFSConnectionError(Exception):
     pass
 
 
+class RPCAccessDenied(Exception):
+    """
+    RPC request denied due to invalid authentication credentials
+    """
+
+
 class APIError(Exception):
     """
     IPFS API error
