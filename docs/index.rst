@@ -92,7 +92,7 @@ of the RPC API by requiring the client to provide credentials via the HTTP
 *Authorization* header, either with a simple *Basic Auth* login and password, or
 with a token. `kubo RPC Authorization documentation <https://github.com/ipfs/kubo/blob/master/docs/config.md#apiauthorizations>`_.
 
-If the kubo server requires authentication, you can pass the authentication
+If the kubo server requires authentication, you can pass the RPC authentication
 credentials via the constructor's *auth* keyword argument::
 
     client = aioipfs.AsyncIPFS(auth=aioipfs.BasicAuth('john', 'password123'))

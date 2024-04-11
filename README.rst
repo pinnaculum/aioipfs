@@ -73,6 +73,15 @@ Otherwise just pass *host* and *port* separately:
 
     client = aioipfs.AsyncIPFS(host='::1', port=5201)
 
+If the kubo server requires authentication, you can pass the RPC authentication
+credentials via the constructor's *auth* keyword argument:
+
+.. code-block:: python
+
+    client = aioipfs.AsyncIPFS(auth=aioipfs.BasicAuth('john', 'password123'))
+
+    client = aioipfs.AsyncIPFS(auth=aioipfs.BearerAuth('my-secret-token'))
+
 Get an IPFS resource
 --------------------
 
