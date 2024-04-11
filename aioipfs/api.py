@@ -360,6 +360,9 @@ class DhtAPI(SubAPI):
             yield value
 
     async def query(self, peerid, verbose=False):
+        """
+        DEPRECATED: This command is deprecated
+        """
         async for value in self.mjson_decode(
                 self.url('dht/query'),
                 params={ARG_PARAM: peerid, 'verbose': boolarg(verbose)}):

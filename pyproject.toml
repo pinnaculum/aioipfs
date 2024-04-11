@@ -48,6 +48,7 @@ car = ["ipfs-car-decoder==0.1.1"]
 test = [
     "pytest",
     "pytest-asyncio",
+    "pytest-cov",
     "tox",
     "flake8",
     "wheel",

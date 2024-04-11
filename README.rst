@@ -15,10 +15,7 @@ releases, see the *CI* section below.
 
 See `the documentation here <https://aioipfs.readthedocs.io/en/latest>`_.
 
-.. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
-    :target: https://github.com/pinnaculum/aioipfs
-
-.. image:: https://gitlab.com/cipres/aioipfs/badges/master/pipeline.svg
+.. image:: https://gitlab.com/cipres/aioipfs/badges/master/coverage.svg
 
 Installation
 ============
@@ -167,6 +164,12 @@ for the CI jobs overview).
 
 - go-ipfs >=0.11.0,<=0.13.0
 - kubo >=0.14.0,<=0.27.0
+
+.. image:: https://github.com/pinnaculum/aioipfs/workflows/aioipfs-build/badge.svg
+    :target: https://github.com/pinnaculum/aioipfs/actions
+
+.. image:: https://gitlab.com/cipres/aioipfs/badges/master/pipeline.svg
+    :target: https://gitlab.com/cipres/aioipfs/-/jobs
 
 Features
 ========
