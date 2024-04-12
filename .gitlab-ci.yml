@@ -12,16 +12,8 @@ variables:
       # we run unit tests against
 
       - IPFSD_TEST_RELEASE: [
-          go-ipfs-0.11.0,
-          go-ipfs-0.12.0,
-          go-ipfs-0.13.0,
-          kubo-0.14.0,
-          kubo-0.16.0,
-          kubo-0.18.0,
           kubo-0.20.0,
-          kubo-0.21.0,
           kubo-0.22.0,
-          kubo-0.23.0,
           kubo-0.24.0,
           kubo-0.26.0,
           kubo-0.27.0

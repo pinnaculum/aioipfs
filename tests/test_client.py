@@ -250,16 +250,17 @@ class TestAsyncIPFS:
 
         iclient_with_auth.auth = aioipfs.BasicAuth('alice', 'password123')
 
+        # alice doesn't have access to the 'id' RPC API
         with pytest.raises(RPCAccessDenied):
             await iclient_with_auth.core.id()
 
         # alice can use the 'files' API
         assert await iclient_with_auth.files.ls('/')
 
-        # alice doesn't have access to the 'add' API
-        cids = [added['Hash'] async for added in iclient_with_auth.add(
-            str(testfile1))]
-        assert len(cids) == 0
+        # alice doesn't have access to the 'add' RPC API
+        with pytest.raises(RPCAccessDenied):
+            cids = [added['Hash'] async for added in iclient_with_auth.add(
+                str(testfile1))]
 
         # john, however, does
         iclient_with_auth.auth = aioipfs.BasicAuth('john', '12345')

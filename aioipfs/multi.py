@@ -47,7 +47,7 @@ def bytes_payload_from_file(filepath):
     return file_payload
 
 
-def glob_compile(pat):
+def glob_compile(pat):  # pragma: no cover
     """ From ipfsapi.multipart
 
        Translate a shell glob PATTERN to a regular expression.

@@ -2,6 +2,8 @@ import json
 import asyncio
 import sys
 
+from typing import Union
+
 from aiohttp.web_exceptions import (HTTPInternalServerError,
                                     HTTPForbidden,
                                     HTTPNotFound,
@@ -51,7 +53,7 @@ class SubAPI:
         except Exception:
             return None, None
 
-    def handle_error(self, response, data):
+    def handle_error(self, response, data: Union[str, None]):
         """
         When the daemon returns an HTTP status code != 200, this
         method is called to raise an API exception.
@@ -199,6 +201,9 @@ class SubAPI:
 
         try:
             async with getattr(session, method)(url, **kwargs) as response:
+                if response.status in HTTP_ERROR_CODES:
+                    self.handle_error(response, await response.text())
+
                 async for raw_message in response.content:
                     message = decode_json(raw_message)
 
@@ -222,8 +227,7 @@ class SubAPI:
             raise e
         except (ClientPayloadError,
                 ClientConnectorError,
-                ServerDisconnectedError,
-                Exception):
+                ServerDisconnectedError):
             if new_session is True:
                 await session.close()
 

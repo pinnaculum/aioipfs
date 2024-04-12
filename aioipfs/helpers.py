@@ -1,7 +1,7 @@
 import functools
 import json
 import re
-import sys
+
 from multiaddr import Multiaddr
 from distutils.version import StrictVersion
 from contextlib import closing
@@ -44,7 +44,7 @@ def quote_args(*args):
 def quote_dict(data):
     quoted = ''
 
-    if not isinstance(data, dict):
+    if not isinstance(data, dict):  # pragma: no cover
         raise ValueError('quote_dict: need dictionary')
 
     for arg, value in data.items():
@@ -63,17 +63,13 @@ def quote_dict(data):
 
 
 def decode_json(data: bytes):
-    try:
-        if not isinstance(data, bytes):
-            raise TypeError('decode_json: invalid value type')
+    if not isinstance(data, bytes):  # pragma: no cover
+        raise TypeError('decode_json: invalid value type')
 
-        if have_orjson:
-            return orjson.loads(data.decode())
-        else:
-            return json.loads(data.decode())
-    except Exception as exc:
-        print('Could not read JSON object:', str(exc), file=sys.stderr)
-        return None
+    if have_orjson:
+        return orjson.loads(data.decode())
+    else:
+        return json.loads(data.decode())
 
 
 def async_enterable(f):
@@ -113,7 +109,7 @@ def unusedTcpPort():
             s.bind(('', 0))
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             return s.getsockname()[1]
-    except Exception:
+    except Exception:  # pragma: no cover
         return None
 
 
@@ -166,8 +162,8 @@ def p2p_addr_explode(addr: str) -> tuple:
                 break
 
         return peerId, os.path.sep + os.path.join(*protoA), pVersion
-    except Exception:
-        return None
+    except Exception as err:
+        raise ValueError(f'Invalid p2p endpoint addr: {err}')
 
 
 def peerid_reencode(peerId: str,
@@ -189,21 +185,21 @@ def peerid_reencode(peerId: str,
     return None
 
 
-def peerid_base32(peerId: str) -> str:
+def peerid_base32(peerId: str) -> str:  # pragma: no cover
     """
     Convert any PeerId to a CIDv1 (base32)
     """
     return peerid_reencode(peerId, base='base32')
 
 
-def peerid_base36(peerId: str) -> str:
+def peerid_base36(peerId: str) -> str:  # pragma: no cover
     """
     Convert any PeerId to a CIDv1 (base36)
     """
     return peerid_reencode(peerId, base='base36')
 
 
-def peerid_base58(peerId: str) -> str:
+def peerid_base58(peerId: str) -> str:  # pragma: no cover
     """
     Convert any PeerId to a CIDv0
     """
