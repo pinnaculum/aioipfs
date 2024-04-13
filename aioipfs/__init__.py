@@ -1,7 +1,7 @@
 __version__ = '0.6.7'
 
 from yarl import URL
-from distutils.version import StrictVersion
+from distutils.version import StrictVersion  # type: ignore
 from typing import Union
 
 import asyncio
@@ -12,9 +12,9 @@ import socket
 
 from aiohttp import BasicAuth
 
-from multiaddr import Multiaddr
-from multiaddr.exceptions import ParseError
-from multiaddr.exceptions import StringParseError
+from multiaddr import Multiaddr  # type: ignore
+from multiaddr.exceptions import ParseError  # type: ignore
+from multiaddr.exceptions import StringParseError  # type: ignore
 
 from aioipfs import api
 from aioipfs.exceptions import *  # noqa
@@ -70,7 +70,7 @@ class AsyncIPFS(object):
                  port: int = RPC_API_DEFAULT_PORT,
                  scheme: str = 'http',
                  maddr: Union[Multiaddr, str] = None,
-                 auth: Union[BasicAuth, BearerAuth] = None,
+                 auth: Union[BasicAuth, BearerAuth, None] = None,
                  loop=None,
                  conns_max: int = 0,
                  conns_max_per_host: int = 0,

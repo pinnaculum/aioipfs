@@ -50,11 +50,13 @@ variables:
     - python -m pip install --upgrade pip
 
     - pip install wheel build
-    - pip install '.[car,test]'
+    - pip install '.[car,dev]'
 
     - flake8 aioipfs tests --count --select=E9,F63,F7,F82 --show-source --statistics
-    - python -m build
+    - mypy aioipfs
     - pytest --cov --cov-report=term --cov-report=xml:coverage.xml -v -s tests
+
+    - python -m build
 
   coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
   artifacts:
@@ -100,7 +102,7 @@ pypi:
     - source venv/bin/activate
     - python -m pip install --upgrade pip
 
-    - pip install '.[car,test]'
+    - pip install .
     - pip install -U twine build
 
     - python -m build

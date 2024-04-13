@@ -4,7 +4,7 @@ from typing import Union
 
 import base58
 import base64
-import multibase
+import multibase  # type: ignore
 
 from aiohttp import payload
 from aioipfs import multi
@@ -85,6 +85,9 @@ class PubSubAPI(SubAPI):
         """
         New publish wire format (post 0.11.0)
         """
+
+        part: Union[payload.StringIOPayload, payload.BytesIOPayload]
+
         params = {
             ARG_PARAM: multibase.encode('base64url', topic).decode()
         }
@@ -104,8 +107,8 @@ class PubSubAPI(SubAPI):
     async def sub(self,
                   topic: str,
                   discover: bool = True,
-                  timeout: int = None,
-                  read_timeout: int = None):
+                  timeout: int = 0,
+                  read_timeout: int = 0):
         """
         Subscribe to messages on a given topic.
 
@@ -140,7 +143,7 @@ class PubSubAPI(SubAPI):
                 headers={'Connection': 'Close'},
                 new_session=True,
                 timeout=timeout if timeout else 60.0 * 60 * 24 * 8,
-                read_timeout=read_timeout if read_timeout else 0,
+                read_timeout=read_timeout,
                 params=params):
             try:
                 if api_post011:

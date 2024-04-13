@@ -45,7 +45,8 @@ content-type = "text/x-rst"
 [project.optional-dependencies]
 orjson = ["orjson>=3.0"]
 car = ["ipfs-car-decoder==0.1.1"]
-test = [
+dev = [
+    "mypy",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",

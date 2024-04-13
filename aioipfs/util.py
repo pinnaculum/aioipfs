@@ -7,7 +7,7 @@ try:
     have_car_decoder = True
 except Exception:
     have_car_decoder = False
-    car_decoder = None
+    car_decoder = None  # type: ignore
 
 
 class CARDecoderMissing(Exception):
@@ -51,7 +51,7 @@ class DotJSON(dict):
     https://gist.github.com/markhu/fbbab71359af00e527d0
     """
 
-    __delattr__ = dict.__delitem__
+    __delattr__ = dict.__delitem__  # type: ignore
 
     def __init__(self, data):
         if isinstance(data, str):

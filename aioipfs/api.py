@@ -2,11 +2,11 @@ import os.path
 import tarfile
 import tempfile
 import sys
-from typing import Union
+from typing import Union, Optional, Dict
 from pathlib import Path
 
 import asyncio
-import aiofiles
+import aiofiles  # type: ignore
 import aioipfs
 
 from aiohttp import payload
@@ -249,7 +249,7 @@ class ConfigAPI(SubAPI):
         :param bool json: Parse stringified JSON
         """
 
-        params = {}
+        params: Dict = {}
 
         if value is not None:
             if boolean:
@@ -257,7 +257,7 @@ class ConfigAPI(SubAPI):
             else:
                 params[ARG_PARAM] = [key, value]
         else:
-            params = {ARG_PARAM: key}
+            params[ARG_PARAM] = key
 
         params['bool'] = boolarg(boolean)
         params['json'] = boolarg(json)
@@ -391,18 +391,18 @@ class DiagAPI(SubAPI):
         return await self.fetch_text(self.url('diag/cmds/clear'))
 
     async def profile(self,
-                      output: str = None,
-                      collectors: list = None,
-                      profile_time: str = None,
-                      mutex_profile_fraction: int = None,
-                      block_profile_rate: str = None):
+                      output: Optional[str] = None,
+                      collectors: Optional[list] = None,
+                      profile_time: Optional[str] = None,
+                      mutex_profile_fraction: Optional[int] = None,
+                      block_profile_rate: Optional[str] = None):
         """
         Collect a performance profile for debugging.
 
         TODO: support passing collectors as an array
         """
 
-        params = {}
+        params: Dict = {}
 
         if isinstance(output, str):
             params['output'] = output
@@ -443,7 +443,7 @@ class FilesAPI(SubAPI):
 
     async def chcid(self, path: str,
                     cidversion: int,
-                    hashfn: str = None):
+                    hashfn: Optional[str] = None):
         params = {ARG_PARAM: path, 'cid-version': str(cidversion)}
 
         if isinstance(hashfn, str):
@@ -460,7 +460,7 @@ class FilesAPI(SubAPI):
                                      params=params)
 
     async def mkdir(self, path, parents=False, cid_version=None,
-                    hashfn: str = None):
+                    hashfn: Optional[str] = None):
         params = {ARG_PARAM: path, 'parents': boolarg(parents)}
 
         if isinstance(hashfn, str):
@@ -487,8 +487,8 @@ class FilesAPI(SubAPI):
                                      params=params)
 
     async def read(self, path,
-                   offset: int = None,
-                   count: int = None):
+                   offset: Optional[int] = None,
+                   count: Optional[int] = None):
         params = {ARG_PARAM: path}
 
         if offset is not None and isinstance(offset, int):
@@ -527,7 +527,7 @@ class FilesAPI(SubAPI):
     async def write(self, mfspath, data, create=False,
                     parents=False, cid_version=None,
                     raw_leaves=False,
-                    hashfn: str = None,
+                    hashfn: Optional[str] = None,
                     truncate=False, offset=-1, count=-1):
         """
         Write to a mutable file in a given filesystem.
@@ -606,7 +606,7 @@ class KeyAPI(SubAPI):
     async def key_import(self,
                          keypath: str,
                          name,
-                         ipns_base: str = None,
+                         ipns_base: Optional[str] = None,
                          format='libp2p-protobuf-cleartext',
                          allow_any_keytype: bool = False):
         """
@@ -660,7 +660,7 @@ class KeyAPI(SubAPI):
                                      params=params)
 
     async def list(self, long=False,
-                   ipns_base: str = None):
+                   ipns_base: Optional[str] = None):
         params = {'l': boolarg(long)}
 
         if isinstance(ipns_base, str):
@@ -670,7 +670,7 @@ class KeyAPI(SubAPI):
                                      params=params)
 
     async def gen(self, name, type='rsa', size: int = 2048,
-                  ipns_base: str = None):
+                  ipns_base: Optional[str] = None):
         params = {ARG_PARAM: name, 'type': type, 'size': str(size)}
 
         if isinstance(ipns_base, str):
@@ -680,7 +680,7 @@ class KeyAPI(SubAPI):
                                      params=params)
 
     async def rm(self, name,
-                 ipns_base: str = None):
+                 ipns_base: Optional[str] = None):
         params = {ARG_PARAM: name}
 
         if isinstance(ipns_base, str):
@@ -688,7 +688,8 @@ class KeyAPI(SubAPI):
 
         return await self.fetch_json(self.url('key/rm'), params=params)
 
-    async def rename(self, src, dst, ipns_base=None, force: bool = False):
+    async def rename(self, src, dst, ipns_base: Optional[str] = None,
+                     force: bool = False):
         params = {
             ARG_PARAM: [src, dst],
             'force': boolarg(force)
@@ -763,7 +764,7 @@ class NameAPI(SubAPI):
 
     async def inspect(self,
                       record: Union[str, Path],
-                      verify: str = None,
+                      verify: Optional[str] = None,
                       dump: bool = True):
         """
         Inspects an IPNS Record
@@ -797,7 +798,7 @@ class NameAPI(SubAPI):
     async def publish(self, path, resolve=True, lifetime='24h',
                       key='self', ttl=None,
                       quieter=False, allow_offline=False,
-                      ipns_base: str = None):
+                      ipns_base: Optional[str] = None):
         """
         Publish IPNS names
 
@@ -1022,11 +1023,11 @@ class ObjectAPI(SubAPI):
 class RefsAPI(SubAPI):
     async def refs(self,
                    path: str,
-                   format: str = None,
+                   format: Optional[str] = None,
                    edges: bool = False,
                    unique: bool = False,
                    recursive: bool = False,
-                   max_depth: int = None):
+                   max_depth: Optional[int] = None):
         """
         List links (references) from an object.
         """
@@ -1427,9 +1428,9 @@ class CoreAPI(SubAPI):
             params={'flags': boolarg(flags)}
         )
 
-    async def id(self, peer: str = None,
-                 format: str = None,
-                 peerid_base: str = None):
+    async def id(self, peer: Optional[str] = None,
+                 format: Optional[str] = None,
+                 peerid_base: Optional[str] = None):
         """
         Show IPFS node id info.
 
@@ -1745,8 +1746,8 @@ class CoreAPI(SubAPI):
 
     async def resolve(self, name,
                       recursive: bool = False,
-                      dht_record_count: int = None,
-                      dht_timeout: int = None):
+                      dht_record_count: Optional[int] = None,
+                      dht_timeout: Optional[int] = None):
         """
         Resolve the value of names to IPFS
 

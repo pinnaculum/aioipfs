@@ -1,3 +1,5 @@
+from typing import Optional
+
 from aioipfs.apis import SubAPI
 from aioipfs.helpers import *  # noqa
 
@@ -146,7 +148,7 @@ class PinAPI(SubAPI):
         self.remote = PinRemoteAPI(driver)
 
     async def add(self, path, recursive=True, progress=True,
-                  name: str = None):
+                  name: Optional[str] = None):
         """
         Pin objects to local storage.
 

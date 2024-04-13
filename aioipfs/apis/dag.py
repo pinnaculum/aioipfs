@@ -1,5 +1,6 @@
 import os.path
 from pathlib import Path
+from typing import Optional
 from aiohttp import payload
 
 from aioipfs.api import SubAPI
@@ -47,7 +48,7 @@ class DagAPI(SubAPI):
                                    params=params, outformat='json')
 
     async def car_export(self, cid: str, progress: bool = False,
-                         output_path: Path = None):
+                         output_path: Optional[Path] = None):
         """
         Streams the selected DAG as a .car stream and return it
         as a raw buffer or write it to a file if output_path is

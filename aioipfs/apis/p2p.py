@@ -1,7 +1,8 @@
 import os.path
+from typing import Any
 
 from yarl import URL
-from multiaddr import Multiaddr
+from multiaddr import Multiaddr  # type: ignore
 
 from aioipfs.api import SubAPI
 from aioipfs.api import ARG_PARAM
@@ -105,6 +106,8 @@ class P2PDialerMixin:
     """
     APIs to help with dialing remote p2p services
     """
+
+    driver: Any
 
     @async_enterable
     async def dial_service(self,
@@ -241,7 +244,7 @@ class P2PDialerMixin:
 
     async def listeners(self) -> list:
         try:
-            resp = await self.ls(headers=True)
+            resp = await self.ls(headers=True)  # type: ignore
             assert isinstance(resp, dict)
             return resp['Listeners'] if resp['Listeners'] else []
         except (AssertionError, APIError):
@@ -249,7 +252,7 @@ class P2PDialerMixin:
 
     async def streams(self) -> list:
         try:
-            resp = await self.stream_ls(headers=True)
+            resp = await self.stream_ls(headers=True)  # type: ignore
             assert isinstance(resp, dict)
             return resp['Streams'] if resp['Streams'] else []
         except (AssertionError, APIError):

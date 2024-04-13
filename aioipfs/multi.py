@@ -4,7 +4,7 @@ import posixpath
 import io
 import re
 
-from gitignore_parser import parse_gitignore
+from gitignore_parser import parse_gitignore  # type: ignore
 import aiohttp
 from aiohttp import payload
 

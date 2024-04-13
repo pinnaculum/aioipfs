@@ -2,9 +2,10 @@ import functools
 import json
 import re
 
-from multiaddr import Multiaddr
-from distutils.version import StrictVersion
+from multiaddr import Multiaddr  # type: ignore
+from distutils.version import StrictVersion  # type: ignore
 from contextlib import closing
+from typing import Union
 import socket
 import os.path
 
@@ -16,7 +17,7 @@ from multiformats_cid import CIDv0
 
 
 try:
-    import orjson
+    import orjson  # type: ignore
 except ImportError:
     have_orjson = False
 else:
@@ -122,58 +123,58 @@ def p2p_addr_explode(addr: str) -> tuple:
 
     into its components, returning a tuple in the form
 
-    (peerId, protoFull, protoVersion)
+    (peer_id, proto_full, proto_version)
 
-    protoFull can be passed to 'ipfs p2p dial'
+    proto_full can be passed to 'ipfs p2p dial'
     """
 
-    peerIdRe = re.compile(r'([\w]){46,59}$')
+    peer_id_re = re.compile(r'([\w]){46,59}$')
 
     parts = addr.lstrip(os.path.sep).split(os.path.sep)
     try:
         assert parts.pop(0) == 'p2p'
-        peerId = parts.pop(0)
+        peer_id = parts.pop(0)
         prefix = parts.pop(0)
-        assert peerIdRe.match(peerId)
+        assert peer_id_re.match(peer_id)
         assert prefix in ['x', 'y', 'z']
 
-        pVersion = None
-        protoA = [prefix]
-        protoPart = parts.pop(0)
-        protoA.append(protoPart)
+        p_version = None
+        proto_a = [prefix]
+        proto_part = parts.pop(0)
+        proto_a.append(proto_part)
 
-        while protoPart:
+        while proto_part:
             try:
-                protoPart = parts.pop(0)
+                proto_part = parts.pop(0)
             except IndexError:
                 break
 
-            protoA.append(protoPart)
+            proto_a.append(proto_part)
 
             try:
-                v = StrictVersion(protoPart)
+                v = StrictVersion(proto_part)
             except Exception:
                 # No version
                 pass
             else:
                 # Found a version, should be last element
-                pVersion = v
+                p_version = v
                 assert len(parts) == 0
                 break
 
-        return peerId, os.path.sep + os.path.join(*protoA), pVersion
+        return peer_id, os.path.sep + os.path.join(*proto_a), p_version
     except Exception as err:
         raise ValueError(f'Invalid p2p endpoint addr: {err}')
 
 
-def peerid_reencode(peerId: str,
+def peerid_reencode(peer_id: str,
                     base: str = 'base36',
-                    multicodec: str = 'libp2p-key') -> str:
+                    multicodec: str = 'libp2p-key') -> Union[str, None]:
     """
     Encode a PeerId to a specific base
     """
 
-    cid = make_cid(peerId)
+    cid = make_cid(peer_id)
     if not cid:
         return None
 
@@ -185,22 +186,22 @@ def peerid_reencode(peerId: str,
     return None
 
 
-def peerid_base32(peerId: str) -> str:  # pragma: no cover
+def peerid_base32(peer_id: str) -> Union[str, None]:  # pragma: no cover
     """
     Convert any PeerId to a CIDv1 (base32)
     """
-    return peerid_reencode(peerId, base='base32')
+    return peerid_reencode(peer_id, base='base32')
 
 
-def peerid_base36(peerId: str) -> str:  # pragma: no cover
+def peerid_base36(peer_id: str) -> Union[str, None]:  # pragma: no cover
     """
     Convert any PeerId to a CIDv1 (base36)
     """
-    return peerid_reencode(peerId, base='base36')
+    return peerid_reencode(peer_id, base='base36')
 
 
-def peerid_base58(peerId: str) -> str:  # pragma: no cover
+def peerid_base58(peer_id: str) -> Union[str, None]:  # pragma: no cover
     """
     Convert any PeerId to a CIDv0
     """
-    return peerid_reencode(peerId, base='base58')
+    return peerid_reencode(peer_id, base='base58')
