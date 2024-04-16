@@ -59,6 +59,11 @@ docs = [
     "sphinxcontrib-asyncio",
     "guzzle_sphinx_theme"
 ]
+bohort = [
+    "appdirs>=1.4.4",
+    "omegaconf==2.3.0",
+    "ptpython-aioipfs>=3.0.27"
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "aioipfs.__version__"}
@@ -69,3 +74,6 @@ include-package-data = false
 [tool.setuptools.packages.find]
 exclude = ["tests"]
 namespaces = false
+
+[project.scripts]
+bohort = "aioipfs.scripts.bohort:run_bohort"

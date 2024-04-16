@@ -13,7 +13,7 @@ for kubo_ version *0.27.0*. Unit tests are run against
 most major go-ipfs releases and all kubo_
 releases, see the *CI* section below.
 
-See `the documentation here <https://aioipfs.readthedocs.io/en/latest>`_.
+See the documentation `here <https://aioipfs.readthedocs.io/en/latest>`_.
 
 .. image:: https://gitlab.com/cipres/aioipfs/badges/master/coverage.svg
 
@@ -23,6 +23,12 @@ Installation
 .. code-block:: shell
 
     pip install aioipfs
+
+To install the requirements for `bohort <https://aioipfs.readthedocs.io/en/latest/bohort.html>`_, a REPL tool for making RPC calls on kubo nodes:
+
+.. code-block:: shell
+
+    pip install 'aioipfs[bohort]'
 
 Support for CAR (Content-Addressable Archives) decoding (with the
 `ipfs-car-decoder package <https://github.com/kralverde/py-ipfs-car-decoder/>`_)

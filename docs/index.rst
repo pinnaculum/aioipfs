@@ -50,6 +50,15 @@ If you want to use orjson_ to decode JSON messages:
 
     pip install 'aioipfs[orjson]'
 
+To install the dependencies required by :ref:`bohort`, a REPL CLI tool
+to interact with kubo nodes:
+
+.. code-block:: shell
+
+    pip install 'aioipfs[bohort]'
+
+Checkout the bohort documentation :doc:`here <bohort>`.
+
 Async IPFS client
 =================
 

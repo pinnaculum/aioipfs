@@ -11,6 +11,7 @@ import aioipfs
 
 from aiohttp import payload
 
+from .apis import HTTP_ERROR_CODES
 from .apis import SubAPI
 from . import multi
 from .helpers import *  # noqa
@@ -456,7 +457,7 @@ class FilesAPI(SubAPI):
         Flush a given path's data to disk.
         """
         params = {ARG_PARAM: path}
-        return await self.fetch_text(self.url('files/flush'),
+        return await self.fetch_json(self.url('files/flush'),
                                      params=params)
 
     async def mkdir(self, path, parents=False, cid_version=None,
@@ -1247,6 +1248,7 @@ class CoreAPI(SubAPI):
 
     def _add_post(self, data, params=None):
         return self.driver.session.post(self.url('add'), data=data,
+                                        auth=self.driver.auth,
                                         params=params if params else {})
 
     async def add_single(self, mpart, params=None):
@@ -1256,6 +1258,9 @@ class CoreAPI(SubAPI):
 
         async with self._add_post(
                 mpart, params=params if params else {}) as response:
+            if response.status in HTTP_ERROR_CODES:
+                self.handle_error(response, await response.text())
+
             return await response.json()
 
     async def add_generic(self, mpart, params=None):
