@@ -670,7 +670,7 @@ class KeyAPI(SubAPI):
         return await self.fetch_json(self.url('key/list'),
                                      params=params)
 
-    async def gen(self, name, type='rsa', size: int = 2048,
+    async def gen(self, name, type='ed25519', size: int = 2048,
                   ipns_base: Optional[str] = None):
         params = {ARG_PARAM: name, 'type': type, 'size': str(size)}
 

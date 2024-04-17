@@ -6,19 +6,6 @@ variables:
   PATH: "/opt/ipfs/bin:/usr/bin:/bin:/sbin"
 
 .build:
-  parallel:
-    matrix:
-      # This is the list of go-ipfs/kubo versions that
-      # we run unit tests against
-
-      - IPFSD_TEST_RELEASE: [
-          kubo-0.20.0,
-          kubo-0.22.0,
-          kubo-0.24.0,
-          kubo-0.26.0,
-          kubo-0.27.0
-        ]
-
   script:
     - apt-get update
     - apt-get install -qy --force-yes python3-pip python3-venv
@@ -67,24 +54,58 @@ build-3.9:
   extends: ".build"
   stage: "build"
   image: "python:3.9-bullseye"
+  parallel:
+    matrix:
+      - IPFSD_TEST_RELEASE: [
+          kubo-0.28.0
+        ]
   rules:
-    - if: $CI_COMMIT_MESSAGE =~ /\[test-all\]/ || $CI_COMMIT_MESSAGE =~ /\[test-39\]/
+    - if: $CI_COMMIT_MESSAGE =~ /\[test-39\]/
       when: always
 
 build-3.11:
   extends: ".build"
   stage: "build"
   image: "python:3.11"
+  parallel:
+    matrix:
+      - IPFSD_TEST_RELEASE: [
+          kubo-0.28.0
+        ]
   rules:
-    - if: $CI_COMMIT_MESSAGE =~ /\[test-all\]/ || $CI_COMMIT_MESSAGE =~ /\[test-311\]/
+    - if: $CI_COMMIT_MESSAGE =~ /\[test-311\]/
       when: always
 
-build-3.12:
+build-3.12-post-020:
   extends: ".build"
   stage: "build"
   image: "python:3.12"
+  parallel:
+    matrix:
+      - IPFSD_TEST_RELEASE: [
+          kubo-0.20.0,
+          kubo-0.22.0,
+          kubo-0.24.0,
+          kubo-0.26.0,
+          kubo-0.27.0,
+          kubo-0.28.0
+        ]
   rules:
-    - if: $CI_COMMIT_MESSAGE =~ /\[test-all\]/ || $CI_COMMIT_MESSAGE =~ /\[test-312\]/
+    - if: $CI_COMMIT_MESSAGE =~ /\[test-312-recent\]/
+      when: always
+
+build-3.12-latest:
+  extends: ".build"
+  stage: "build"
+  image: "python:3.12"
+  parallel:
+    matrix:
+      - IPFSD_TEST_RELEASE: [
+          kubo-0.26.0,
+          kubo-0.28.0
+        ]
+  rules:
+    - if: $CI_COMMIT_MESSAGE =~ /\[test-312-latest\]/
       when: always
 
 pypi:

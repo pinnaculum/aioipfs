@@ -711,6 +711,13 @@ class TestAsyncIPFS:
     async def test_object(self, event_loop, ipfsdaemon, iclient, obj1, obj2,
                           testfile2):
         """ Unsure if this is correct """
+
+        if await iclient.agent_version_get() >= \
+                aioipfs.IpfsDaemonVersion('0.28.0'):
+            # Many of the 'object' RPC API methods are being deprecated
+            # starting with kubo v0.28.0
+            pytest.skip('This API is deprecated for this kubo version')
+
         obj1Ent = await iclient.add_bytes(obj1)
         obj2Ent = await iclient.add_bytes(obj2)
         obj = await iclient.object.new()

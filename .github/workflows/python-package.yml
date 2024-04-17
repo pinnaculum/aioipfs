@@ -25,7 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build '.[car,test]'
+        pip install build '.[car,dev]'
 
     - name: Fetch kubo (win)
       uses: engineerd/configurator@v0.0.8
@@ -72,7 +72,7 @@ jobs:
     - name: Build wheel
       run: |
         python -m pip install --upgrade pip
-        pip install build '.[car,test]'
+        pip install build '.[car,dev]'
         python -m build
 
     - name: Upload to PyPI

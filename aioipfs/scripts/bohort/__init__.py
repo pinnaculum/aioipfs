@@ -16,6 +16,7 @@ from aioipfs.apis import SubAPI
 import appdirs  # type: ignore
 
 from omegaconf import OmegaConf
+from omegaconf import DictConfig
 
 from .cli import configure
 
@@ -29,10 +30,31 @@ class Context:
     interactive: bool = False
 
 
-async def _cmd_wrapper(ctx: Context, method: str, *args, **kwargs):
+def rpc_method_config(config: DictConfig, method: str) -> Union[DictConfig,
+                                                                None]:
+    rpc = config.get('rpc_methods')
+
+    if isinstance(rpc, DictConfig):
+        return rpc.get(method)
+
+    return None
+
+
+async def _cmd_wrapper(config: DictConfig,
+                       ctx: Context, method: str, *args, **kwargs):
     try:
         meth = operator.attrgetter(method)(ctx.client)
         assert meth
+
+        rpc_cfg = rpc_method_config(config, method)
+        if rpc_cfg and 'defaults' in rpc_cfg:
+            defaults = OmegaConf.to_container(rpc_cfg.defaults)  # type: ignore
+
+            if isinstance(defaults, dict):
+                for key, value in defaults.items():
+                    if key not in kwargs and isinstance(value,
+                                                        (int, float, str)):
+                        kwargs[key] = value  # type: ignore
 
         if inspect.isasyncgenfunction(meth):
             # async generator
@@ -74,7 +96,8 @@ async def start(args, cfg_dir: Path, data_dir: Path) -> None:
     if not cfg_path.exists():
         with open(cfg_path, 'wt') as f:
             OmegaConf.save(OmegaConf.create({
-                'nodes': {}
+                'nodes': {},
+                'rpc_methods': {}
             }), f)
 
     with open(cfg_path, 'rt') as f:
@@ -170,7 +193,7 @@ async def start(args, cfg_dir: Path, data_dir: Path) -> None:
                         continue
 
                     clocals[cmd] = functools.partial(
-                        _cmd_wrapper, ctx, f'{subapi_name}.{mname}'
+                        _cmd_wrapper, cfg, ctx, f'{subapi_name}.{mname}'
                     )
 
             await embed(
@@ -179,7 +202,8 @@ async def start(args, cfg_dir: Path, data_dir: Path) -> None:
                 return_asyncio_coroutine=True,
                 patch_stdout=True,
                 configure=configure,
-                history_filename=args.history_path
+                history_filename=args.history_path if
+                not args.no_history else None
             )  # type: ignore
     except aioipfs.RPCAccessDenied:
         print('RPC access denied!')
@@ -204,7 +228,7 @@ def run_bohort():
         '--maddr',
         '-m',
         dest='maddr',
-        default='/ip4/127.0.0.1/tcp/5001',
+        default='/dns4/localhost/tcp/5001',
         help="kubo RPC API multiaddr"
     )
     parser.add_argument(
@@ -222,6 +246,13 @@ def run_bohort():
         help='History file path'
     )
     parser.add_argument(
+        '--no-history',
+        dest='no_history',
+        action='store_true',
+        default=False,
+        help='Disable history'
+    )
+    parser.add_argument(
         '--save',
         dest='save_node',
         default=None,
@@ -229,6 +260,7 @@ def run_bohort():
     )
     parser.add_argument(
         '--node',
+        '--load',
         '-n',
         dest='node',
         help='Load node with this name from the config file',

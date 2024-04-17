@@ -21,6 +21,7 @@ library to access kubo's
    :name: mastertoc
 
    api
+   bohort
 
 .. module:: aioipfs
 .. currentmodule:: aioipfs
