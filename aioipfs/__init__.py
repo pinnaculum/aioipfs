@@ -1,9 +1,10 @@
-__version__ = '0.6.9'
+__version__ = '0.7.0'
 
 from yarl import URL
 from distutils.version import StrictVersion  # type: ignore
 from typing import Union
 
+import async_timeout
 import asyncio
 import aiohttp
 import ipaddress
@@ -351,6 +352,12 @@ class AsyncIPFS(object):
         except Exception:
             # Shouldn't assume dns4 here
             return Multiaddr(f'/dns4/{self.host}/tcp/{port}')
+
+    def timeout(self, time: float) -> async_timeout.Timeout:
+        return async_timeout.timeout(time)
+
+    def timeout_at(self, time: float) -> async_timeout.Timeout:
+        return async_timeout.timeout_at(time)
 
     async def __aenter__(self):
         return self

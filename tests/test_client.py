@@ -147,6 +147,16 @@ class TestAsyncIPFS:
         await iclient.commands()
 
     @pytest.mark.asyncio
+    async def test_timeout(self, event_loop, iclient):
+        with pytest.raises(asyncio.TimeoutError):
+            async with iclient.timeout(1):
+                await asyncio.sleep(3)
+
+        with pytest.raises(asyncio.TimeoutError):
+            async with iclient.timeout_at(event_loop.time() + 2):
+                await asyncio.sleep(4)
+
+    @pytest.mark.asyncio
     async def test_bootstrap(self, event_loop, ipfsdaemon, iclient):
         await iclient.bootstrap.list()
 

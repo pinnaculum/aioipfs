@@ -7,7 +7,7 @@ from distutils.version import StrictVersion  # type: ignore
 from contextlib import closing
 from typing import Union
 import socket
-import os.path
+import posixpath
 
 from urllib.parse import quote
 
@@ -130,7 +130,7 @@ def p2p_addr_explode(addr: str) -> tuple:
 
     peer_id_re = re.compile(r'([\w]){46,59}$')
 
-    parts = addr.lstrip(os.path.sep).split(os.path.sep)
+    parts = addr.lstrip('/').split('/')
     try:
         assert parts.pop(0) == 'p2p'
         peer_id = parts.pop(0)
@@ -162,7 +162,7 @@ def p2p_addr_explode(addr: str) -> tuple:
                 assert len(parts) == 0
                 break
 
-        return peer_id, os.path.sep + os.path.join(*proto_a), p_version
+        return peer_id, '/' + posixpath.join(*proto_a), p_version
     except Exception as err:
         raise ValueError(f'Invalid p2p endpoint addr: {err}')
 
