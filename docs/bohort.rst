@@ -13,6 +13,11 @@ commands through the HTTP RPC API.
 
     pip install 'aioipfs[bohort]'
 
+.. video:: https://bafybeicvpnbnmizmeoazw7klme4xkvczff4yrrjyb3wyookz523zvn6ane.ipfs.dweb.link/bohort-demo.mp4
+   :autoplay:
+   :width: 640
+   :height: 480
+
 =======
 Running
 =======

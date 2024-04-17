@@ -44,7 +44,8 @@ release = ''
 
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinxcontrib.asyncio'
+    'sphinxcontrib.asyncio',
+    'sphinxcontrib.video'
 ]
 
 # Add any paths that contain templates here, relative to this directory.

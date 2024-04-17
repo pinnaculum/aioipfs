@@ -58,6 +58,7 @@ dev = [
 docs = [
     "sphinx==5.3.0",
     "sphinxcontrib-asyncio",
+    "sphinxcontrib-video",
     "guzzle_sphinx_theme"
 ]
 bohort = [
