@@ -90,6 +90,9 @@ The configuration file location (on Posix platforms) is: **~/.config/aioipfs/boh
 RPC methods
 -----------
 
+RPC params
+^^^^^^^^^^
+
 You can set the default params that will be passed to specific RPC methods
 by defining the default coroutine keyword arguments for each method:
 
@@ -110,6 +113,41 @@ by defining the default coroutine keyword arguments for each method:
 
 If you pass a parameter for which you've set a default in the config, the default
 value won't be used.
+
+Timeout
+^^^^^^^
+
+You can set a timeout (in seconds) for each RPC method:
+
+.. code-block:: yaml
+
+    rpc_methods:
+      core.ls:
+        timeout: 60
+
+REPL settings
+^^^^^^^^^^^^^
+
+.. code-block:: yaml
+
+    repl:
+      cursor_shape: Blink block
+      input_prompt_color: ansigreen
+      output_prompt_color: ansiyellow
+
+      # Possible values: POP_UP, MULTI_COLUMN, TOOLBAR or NONE
+      completion_visualisation: POP_UP
+
+      color_scheme: default
+      show_signature: true
+      enable_history_search: true
+      enable_auto_suggest: true
+      complete_while_typing: false
+      confirm_exit: false
+
+Check out ptpython's
+`config.py example <https://github.com/prompt-toolkit/ptpython/blob/master/examples/ptpython_config/config.py>`_ for a description of all the settings.
+
 
 REPL toolkit documentation
 --------------------------

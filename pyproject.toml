@@ -77,5 +77,8 @@ include-package-data = false
 exclude = ["tests"]
 namespaces = false
 
+[tool.setuptools.package-data]
+"aioipfs.scripts.bohort" = ["*.yaml"]
+
 [project.scripts]
 bohort = "aioipfs.scripts.bohort:run_bohort"

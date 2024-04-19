@@ -1,0 +1,14 @@
+nodes: {}
+rpc_methods: {}
+
+repl:
+  cursor_shape: 'Blink block'
+  input_prompt_color: 'ansigreen'
+  output_prompt_color: 'ansiyellow'
+  completion_visualisation: POP_UP
+  color_scheme: default
+  show_signature: true
+  enable_history_search: true
+  enable_auto_suggest: true
+  complete_while_typing: false
+  confirm_exit: false

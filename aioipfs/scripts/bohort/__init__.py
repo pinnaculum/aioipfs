@@ -6,6 +6,7 @@ import operator
 import inspect
 
 from dataclasses import dataclass
+from importlib import resources
 from pathlib import Path
 from typing import Union, List, Dict
 from ptpython import embed
@@ -16,12 +17,13 @@ from aioipfs.apis import SubAPI
 import appdirs  # type: ignore
 
 from omegaconf import OmegaConf
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 from .cli import configure
+from .cli import pf_text
 
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 
 @dataclass
@@ -30,8 +32,8 @@ class Context:
     interactive: bool = False
 
 
-def rpc_method_config(config: DictConfig, method: str) -> Union[DictConfig,
-                                                                None]:
+def rpc_method_config(config: DictConfig,
+                      method: str) -> Union[DictConfig, None]:
     rpc = config.get('rpc_methods')
 
     if isinstance(rpc, DictConfig):
@@ -42,35 +44,49 @@ def rpc_method_config(config: DictConfig, method: str) -> Union[DictConfig,
 
 async def _cmd_wrapper(config: DictConfig,
                        ctx: Context, method: str, *args, **kwargs):
+    timeout: float = 0
     try:
         meth = operator.attrgetter(method)(ctx.client)
         assert meth
 
         rpc_cfg = rpc_method_config(config, method)
-        if rpc_cfg and 'defaults' in rpc_cfg:
-            defaults = OmegaConf.to_container(rpc_cfg.defaults)  # type: ignore
+        if rpc_cfg:
+            timeout = rpc_cfg.get('timeout', 0)
+            assert isinstance(timeout, (int, float)), \
+                f"Invalid timeout config for method: {method}"
 
-            if isinstance(defaults, dict):
-                for key, value in defaults.items():
-                    if key not in kwargs and isinstance(value,
-                                                        (int, float, str)):
-                        kwargs[key] = value  # type: ignore
+            if 'defaults' in rpc_cfg:
+                defaults = OmegaConf.to_container(
+                    rpc_cfg.defaults)  # type: ignore
 
-        if inspect.isasyncgenfunction(meth):
-            # async generator
-            _entries: List = []
+                if isinstance(defaults, dict):
+                    for key, value in defaults.items():
+                        if key not in kwargs and isinstance(value,
+                                                            (int, float, str)):
+                            kwargs[key] = value  # type: ignore
 
-            async for entry in meth(*args, **kwargs):
-                _entries.append(entry)
+        async with ctx.client.timeout(
+                timeout if timeout > 0 else None):  # type: ignore
+            if inspect.isasyncgenfunction(meth):
+                # async generator
+                _entries: List = []
 
-            return _entries
-        else:
-            # coroutine
-            return await meth(*args, **kwargs)
+                async for entry in meth(*args, **kwargs):
+                    _entries.append(entry)
+
+                return _entries
+            else:
+                # coroutine
+
+                return await meth(*args, **kwargs)
     except aioipfs.RPCAccessDenied:
         print('Access denied for this RPC endpoint! Check your credentials.')
     except (aioipfs.APIError, aioipfs.UnknownAPIError) as aerr:
         print(f'API error {aerr.code}: {aerr.message}')
+    except asyncio.TimeoutError:
+        pf_text(f'Timeout for method: {method} ({timeout} secs)')
+    except asyncio.CancelledError as err:
+        pf_text(f'Method {method} cancelled: {err}')
     except AttributeError:
         print(f'No such client method: {method}')
     except BaseException:
@@ -90,18 +106,25 @@ def get_auth_helper(creds: str) -> Union[aioipfs.BasicAuth,
     raise ValueError(f'Invalid RPC credentials value: {creds}')
 
 
+def save_config(cfg_path: Path, config: Union[DictConfig, ListConfig]):
+    with open(cfg_path, 'wt') as f:
+        OmegaConf.save(config, f)
+
+
 async def start(args, cfg_dir: Path, data_dir: Path) -> None:
     cfg_path = cfg_dir.joinpath('bohort.yaml')
 
     if not cfg_path.exists():
-        with open(cfg_path, 'wt') as f:
-            OmegaConf.save(OmegaConf.create({
-                'nodes': {},
-                'rpc_methods': {}
-            }), f)
+        cfg_path.touch()
 
     with open(cfg_path, 'rt') as f:
         cfg = OmegaConf.load(f)
+
+    with resources.files(__name__).joinpath(
+            'default_config.yaml').open('r') as f:
+        cfg = OmegaConf.merge(OmegaConf.load(f), cfg)
+
+        save_config(cfg_path, cfg)
 
     if args.save_node:
         assert re.match(r'^[\w_-]+$', args.save_node), \
@@ -122,8 +145,7 @@ async def start(args, cfg_dir: Path, data_dir: Path) -> None:
         })
         cfg = OmegaConf.merge(ncfg, cfg)
 
-        with open(cfg_path, 'wt') as f:
-            OmegaConf.save(cfg, f)
+        save_config(cfg_path, cfg)
 
     if args.node:
         node, credid = tuple(args.node.split(
@@ -201,7 +223,7 @@ async def start(args, cfg_dir: Path, data_dir: Path) -> None:
                 locals=clocals,
                 return_asyncio_coroutine=True,
                 patch_stdout=True,
-                configure=configure,
+                configure=functools.partial(configure, cfg),
                 history_filename=args.history_path if
                 not args.no_history else None
             )  # type: ignore
